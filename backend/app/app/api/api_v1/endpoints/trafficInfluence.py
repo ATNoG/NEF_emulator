@@ -5,12 +5,11 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from pymongo.database import Database
 from sqlalchemy.orm import Session
-from app import models, schemas
+from app import models, schemas, tools
 from app.api import deps
 from app.crud import crud_mongo, user, ue
 from app.db.session import client
 from .utils import add_notifications
-from app import tools
 
 router = APIRouter()
 db_collection= 'TrafficInfluence'

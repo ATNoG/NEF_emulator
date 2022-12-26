@@ -24,5 +24,3 @@ nef_router.include_router(endpoints.qosMonitoring.router, prefix="/3gpp-as-sessi
 nef_router.include_router(endpoints.bdtManagement.router, prefix="/3gpp-bdt/v1", tags=["Resource Management of Bdt API"])
 nef_router.include_router(endpoints.trafficInfluence.router, prefix="/3gpp-traffic-influence/v1", tags=["Traffic Influence API"])
 nef_router.include_router(endpoints.testReport.router, prefix="/test-report/v1", tags=["Test Report API"])
-
-

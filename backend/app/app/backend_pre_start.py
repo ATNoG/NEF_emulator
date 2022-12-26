@@ -44,6 +44,7 @@ def capif_nef_connector():
 
         capif_connector.publish_services(service_api_description_json_full_path="app/core/capif_files/service_monitoring_event.json")
         capif_connector.publish_services(service_api_description_json_full_path="app/core/capif_files/service_as_session_with_qos.json")
+        capif_connector.publish_services(service_api_description_json_full_path="app/core/capif_files/service_bdt.json")
     except requests.exceptions.HTTPError as err:
         if err.response.status_code == 409:
             logger.error(f'"Http Error:", {err.response.json()}')

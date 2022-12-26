@@ -8,7 +8,7 @@ from fastapi.exceptions import HTTPException
 from sqlalchemy.orm.session import Session
 from app import models, schemas, crud
 from app.api import deps
-from app.schemas import monitoringevent, UserPlaneNotificationData
+from app.schemas import monitoringevent, UserPlaneNotificationData, resourceManagementOfBdt
 from pydantic import BaseModel
 from app.api.api_v1.endpoints.paths import get_random_point
 from app.api.api_v1.endpoints.ue_movement import retrieve_ue_state
@@ -34,6 +34,8 @@ def add_notifications(request: Request, response: JSONResponse, is_notification:
         serviceAPI = "AsSession With QoS API"
     elif endpoint.find('qosInfo') != -1:
         serviceAPI = "QoS Information"
+    elif endpoint.find('bdt') != -1:
+        serviceAPI = "Resource Management Of Bdt API"
 
     #Request body check and trim
     if(request.method == 'POST') or (request.method == 'PUT'):  
@@ -238,6 +240,13 @@ def create_item(item: UserPlaneNotificationData, request: Request):
 
 @router.post("/monitoring/callback")
 def create_item(item: monitoringevent.MonitoringNotification, request: Request):
+
+    http_response = JSONResponse(content={'ack' : 'TRUE'}, status_code=200)
+    add_notifications(request, http_response, True)
+    return http_response 
+
+@router.post("/bdt/callback")
+def create_item(item: resourceManagementOfBdt.ExNotification, request: Request):
 
     http_response = JSONResponse(content={'ack' : 'TRUE'}, status_code=200)
     add_notifications(request, http_response, True)

@@ -25,6 +25,7 @@ def read_active_subscriptions(
     tools.reports.update_report(scsAsId, endpoint, "GET")
     pass
 
+
 #Callback 
 
 bdt_callback_router = APIRouter()
