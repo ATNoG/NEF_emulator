@@ -23,4 +23,4 @@ nef_router.include_router(endpoints.monitoringevent.router, prefix="/3gpp-monito
 nef_router.include_router(endpoints.qosMonitoring.router, prefix="/3gpp-as-session-with-qos/v1", tags=["Session With QoS API"])
 nef_router.include_router(endpoints.bdtManagement.router, prefix="/3gpp-bdt/v1", tags=["Resource Management of Bdt API"])
 nef_router.include_router(endpoints.trafficInfluence.router, prefix="/3gpp-traffic-influence/v1", tags=["Traffic Influence API"])
-nef_router.include_router(endpoints.testReport.router, prefix="/test-report/v1", tags=["Test Report API"])
+nef_router.include_router(endpoints.trafficInfluence.router, prefix="/3gpp-chargeable-party/v1", tags=["Chargeable Party API"])
