@@ -9,6 +9,9 @@ def create_report():
             json.dump(data, jsonFile)
     pass
 
+def get_report_path():
+    return os.path.abspath('report.json')
+
 def update_report(scsAsId, endpoint, method, json_item=None, subs_id=-1):
     with open("report.json", "r") as jsonFile:
             data = json.load(jsonFile)
