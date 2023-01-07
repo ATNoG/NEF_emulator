@@ -12,3 +12,4 @@ from .monitoringevent import router
 from .bdtManagement import router
 from .trafficInfluence import router
 from .chargeableParty import router
+from .testReport import router
