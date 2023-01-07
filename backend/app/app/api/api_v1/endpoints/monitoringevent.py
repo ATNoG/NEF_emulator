@@ -1,10 +1,17 @@
 from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException, Path, Response, Request
 from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
+from pymongo.database import Database
 from app import models, schemas
+
+from app.crud import crud_mongo, user, ue
 from app.api import deps
 from app import tools
+from app.db.session import client
+from app.api.api_v1.endpoints.utils import add_notifications
+from .ue_movement import retrieve_ue_state, retrieve_ue
 
 router = APIRouter()
 db_collection= 'MonitoringEvent'
@@ -28,7 +35,8 @@ monitoring_callback_router = APIRouter()
 def monitoring_notification(body: schemas.MonitoringNotification):
     pass
 
-@router.post("/{scsAsId}/subscriptions")
+
+@router.post("/{scsAsId}/subscriptions", response_model=schemas.MonitoringEventReport, responses={201: {"model" : schemas.MonitoringEventSubscription}}, callbacks=monitoring_callback_router.routes)
 def create_subscription(
     *,
     scsAsId: str = Path(..., title="The ID of the Netapp that creates a subscription", example="myNetapp"),
