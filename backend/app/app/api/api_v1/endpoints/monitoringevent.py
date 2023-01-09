@@ -29,7 +29,8 @@ monitoring_callback_router = APIRouter()
 def monitoring_notification(body: schemas.MonitoringNotification):
     pass
 
-@router.post("/{scsAsId}/subscriptions")
+
+@router.post("/{scsAsId}/subscriptions", response_model=schemas.MonitoringEventReport, responses={201: {"model" : schemas.MonitoringEventSubscription}}, callbacks=monitoring_callback_router.routes)
 def create_subscription(
     *,
     scsAsId: str = Path(..., title="The ID of the Netapp that creates a subscription", example="myNetapp"),
