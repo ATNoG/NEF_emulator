@@ -10,4 +10,5 @@ from .qosMonitoring import AsSessionWithQoSSubscriptionCreate, AsSessionWithQoSS
 from .resourceManagementOfBdt import Bdt, BdtCreate, BdtPatch, ExNotification
 from .trafficInfluence import TrafficInfluSub, TrafficInfluSubCreate, EventNotification
 from .chargeableParty import ChargeableParty, ChargeablePartyCreate
+from .netStatReport import NetworkStatusReportingSubscription, NetworkStatusReportingSubscriptionCreate, NetworkStatusReportingNotification
 from .utils import scenario

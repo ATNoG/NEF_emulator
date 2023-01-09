@@ -13,3 +13,4 @@ from .bdtManagement import router
 from .trafficInfluence import router
 from .chargeableParty import router
 from .testReport import router
+from .netStatReport import router
