@@ -3,9 +3,6 @@ from datetime import datetime
 from pydantic import BaseModel, Field, IPvAnyAddress, AnyHttpUrl
 from enum import Enum
 
-class CongestionValue(BaseModel):
-    value: int = Field(0, description="Unsigned integer with valid values between 0 and 31. The value 0 indicates that there is no congestion. The value 1 is the lowest congestion level and value 31 is the highest congestion level.", ge=0, le=31)
-    
 class CongestionType(str, Enum):
     high = "HIGH"
     medium = "MEDIUM"
@@ -33,6 +30,6 @@ class NetworkStatusReportingSubscription(NetworkStatusReportingSubscriptionCreat
 class NetworkStatusReportingNotification(BaseModel):
     """Represents a network status reporting notification."""
     subscription: AnyHttpUrl
-    nsiValue: Optional[CongestionValue] = Field(None, description= "Network Status Indicator based on exact value for congestion status received from RCAF(s). ")
+    nsiValue: Optional[int] = Field(None, description= "Network Status Indicator based on exact value for congestion status received from RCAF(s).", ge=0, le=31)
     nsiType: Optional[CongestionType] = Field(None, description="Network Status Indicator based on abstracted value for congestion status.")
 

@@ -6,11 +6,12 @@ from .paths import router
 from .gNB import router
 from .Cell import router
 from .UE import router
+from .testReport import router
 from .qosInformation import router
 from .qosMonitoring import router
 from .monitoringevent import router
 from .bdtManagement import router
 from .trafficInfluence import router
 from .chargeableParty import router
-from .testReport import router
 from .netStatReport import router
+from .cpParameterProvisioning import router

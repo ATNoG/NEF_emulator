@@ -36,6 +36,14 @@ def add_notifications(request: Request, response: JSONResponse, is_notification:
         serviceAPI = "QoS Information"
     elif endpoint.find('bdt') != -1:
         serviceAPI = "Resource Management Of Bdt API"
+    elif endpoint.find('traffic-influence') != -1:
+        serviceAPI = "Traffic Influence API"
+    elif endpoint.find('chargeable-party') != -1:
+        serviceAPI = "Chargeable Party API"
+    elif endpoint.find('net-stat-report') != -1:
+        serviceAPI = "Reporting Network Status API"
+    elif endpoint.find('cp-parameter-provisioning') != -1:
+        serviceAPI = "Cp Parameter Provisioning API"
 
     #Request body check and trim
     if(request.method == 'POST') or (request.method == 'PUT'):  
