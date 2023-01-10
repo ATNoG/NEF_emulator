@@ -266,7 +266,140 @@ def get_qos_subscription_by_id(base_url, key, netApp_id, sub_id):
 
     return resp_content
 
+def create_cp_parameter_provisioning_subscription(base_url, key, netApp_id):
 
+    scsAsId = netApp_id
+
+    token_test_url = base_url + '/nef/api/v1/3gpp-cp-parameter-provisioning/v1/netapp/subscriptions'
+
+    headers = CaseInsensitiveDict()
+
+    headers["accept"] = "application/json"
+
+    headers["Authorization"] = "Bearer " + key
+
+    headers["Content-Type"] = "application/json"
+
+    data ={
+    "mtcProviderId": "string",
+    "dnn": "province1.mnc01.mcc202.gprs",
+    "externalId": "123456789@domain.com",
+    "msisdn": "918369110173",
+    "externalGroupId": "Group1@domain.com",
+    "cpParameterSets": [
+        {
+        "setId": "string",
+        "validityTime": "2023-01-09T16:59:08.647Z",
+        "periodicCommunicationIndicator": "PERIODICALLY",
+        "communicationDurationTime": 0,
+        "periodicTime": 0,
+        "scheduledCommunicationTime": {},
+        "scheduledCommunicationType": "DOWNLINK",
+        "stationaryIndication": "STATIONARY",
+        "batteryInds": [
+            "BATTERY_RECHARGE"
+        ],
+        "trafficProfile": "SINGLE_TRANS_UL",
+        "expectedUmts": [
+            {}
+        ],
+        "link": "https://myresource.com"
+        },
+        {
+        "setId": "ola",
+        "validityTime": "2023-01-09T16:59:08.647Z",
+        "periodicCommunicationIndicator": "PERIODICALLY",
+        "communicationDurationTime": 0,
+        "periodicTime": 0,
+        "scheduledCommunicationTime": {},
+        "scheduledCommunicationType": "UPLINK",
+        "stationaryIndication": "STATIONARY",
+        "batteryInds": [
+            "BATTERY_RECHARGE"
+        ],
+        "trafficProfile": "SINGLE_TRANS_UL",
+        "expectedUmts": [
+            {}
+        ],
+        "link": "https://myresource.com"
+        },
+        {
+        "setId": "ola50",
+        "validityTime": "2023-01-09T16:59:08.647Z",
+        "periodicCommunicationIndicator": "PERIODICALLY",
+        "communicationDurationTime": 0,
+        "periodicTime": 0,
+        "scheduledCommunicationTime": {},
+        "scheduledCommunicationType": "UPLINK",
+        "stationaryIndication": "STATIONARY",
+        "batteryInds": [
+            "BATTERY_RECHARGE"
+        ],
+        "trafficProfile": "SINGLE_TRANS_UL",
+        "expectedUmts": [
+            {}
+        ],
+        "link": "https://myresource.com"
+        }
+    ],
+    "snssai": {
+        "sst": 1,
+        "sd": "000001"
+    },
+    "ueMacAddr": "22-00-00-00-00-00"
+    }
+
+    resp = requests.post(token_test_url, headers=headers, data=json.dumps(data))
+
+    resp_content = resp.json()
+
+    return resp_content
+
+def get_cp_parameter_provisioning_subscription_by_id(base_url, key, netApp_id, sub_id):
+
+    scsAsId = netApp_id
+
+    subscription_id = sub_id
+
+    token_test_url = base_url + '/nef/api/v1/3gpp-cp-parameter-provisioning/v1/netapp/subscriptions/1'
+
+    headers = CaseInsensitiveDict()
+
+    headers["accept"] = "application/json"
+
+    headers["Authorization"] = "Bearer " + key
+
+    headers["Content-Type"] = "application/json"
+
+    resp = requests.get(token_test_url, headers=headers)
+
+    resp_content = resp.json()
+
+    return resp_content
+
+def get_cp_parameter_provisioning_set_by_id(base_url, key, netApp_id, sub_id, set_id):
+
+    scsAsId = netApp_id
+
+    subscription_id = sub_id
+
+    cp_set_id = set_id
+
+    token_test_url = base_url + '/nef/api/v1/3gpp-cp-parameter-provisioning/v1/netapp/subscriptions/1/cpSets/ola50'
+
+    headers = CaseInsensitiveDict()
+
+    headers["accept"] = "application/json"
+
+    headers["Authorization"] = "Bearer " + key
+
+    headers["Content-Type"] = "application/json"
+
+    resp = requests.get(token_test_url, headers=headers)
+
+    resp_content = resp.json()
+
+    return resp_content
 
 if __name__ == "__main__":
 
@@ -299,6 +432,12 @@ if __name__ == "__main__":
     create_qos_subscription(base_url, key, "netAppTest")
     
     get_qos_subscriptions(base_url,key, "netAppTest")
+
+    create_cp_parameter_provisioning_subscription(base_url,key, "netAppTest")
+
+    get_cp_parameter_provisioning_subscription_by_id(base_url,key, "netAppTest", 1)
+
+    get_cp_parameter_provisioning_set_by_id(base_url,key, "netAppTest", 1, "ola2")
 
     # delete_report(base_url, key)
 
