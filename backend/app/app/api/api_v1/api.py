@@ -26,4 +26,7 @@ nef_router.include_router(endpoints.bdtManagement.router, prefix="/3gpp-bdt/v1",
 nef_router.include_router(endpoints.trafficInfluence.router, prefix="/3gpp-traffic-influence/v1", tags=["Traffic Influence API"])
 nef_router.include_router(endpoints.chargeableParty.router, prefix="/3gpp-chargeable-party/v1", tags=["Chargeable Party API"])
 nef_router.include_router(endpoints.netStatReport.router, prefix="/3gpp-net-stat-report/v1", tags=["Reporting Network Status API"])
-nef_router.include_router(endpoints.cpParameterProvisioning.router, prefix="/3gpp-cp-parameter-provisioning/v1", tags=["Cp Parameter Provisioning API"])
+nef_router.include_router(endpoints.cpParameterProvisioning.router, prefix="/3gpp-cp-parameter-provisioning/v1", tags=["Communication Patterns (CP) Parameters Provisioning API"])
+nef_router.include_router(endpoints.pfdManagement.router, prefix="/3gpp-pfd-management/v1", tags=["Packet Flow Description (PFD) Management API"])
+nef_router.include_router(endpoints.npConfiguration.router, prefix="/3gpp-network-parameter-configuration/v1", tags=["Network Parameter Configuration API"])
+nef_router.include_router(endpoints.racsProvisioning.router, prefix="/3gpp-racs-pp/v1", tags=["RACS (Radio Capability Signaling) Parameter Provisioning API"])

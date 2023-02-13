@@ -65,7 +65,7 @@ def update_subscription(
     *,
     scsAsId: str = Path(..., title="The ID of the Netapp that creates a subscription", example="myNetapp"),
     transactionId: str = Path(..., title="Identifier of the subscription resource"),
-    item_in: schemas.TrafficInfluSubCreate,
+    item_in: schemas.ChargeablePartyCreate,
     current_user: models.User = Depends(deps.get_current_active_user),
     http_request: Request
 ) -> Any:

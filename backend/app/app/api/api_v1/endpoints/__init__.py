@@ -15,3 +15,6 @@ from .trafficInfluence import router
 from .chargeableParty import router
 from .netStatReport import router
 from .cpParameterProvisioning import router
+from .pfdManagement import router
+from .npConfiguration import router
+from .racsProvisioning import router

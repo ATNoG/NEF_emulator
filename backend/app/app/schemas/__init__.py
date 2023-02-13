@@ -13,4 +13,8 @@ from .trafficInfluence import TrafficInfluSub, TrafficInfluSubCreate, EventNotif
 from .chargeableParty import ChargeableParty, ChargeablePartyCreate
 from .netStatReport import NetworkStatusReportingSubscription, NetworkStatusReportingSubscriptionCreate, NetworkStatusReportingNotification
 from .cpParameterProvisioning import CpInfo, CpInfoCreate, CpParameterSet, CpParameterSetCreate
+from .pfdManagement import PfdManagement, PfdManagementCreate
+from .npConfiguration import NpConfiguration, NpConfigurationCreate, ConfigurationNotification
+from .racsProvisioning import RacsProvisioningData, RacsProvisioningDataCreate
+from .niddConfigurationTrigger import NiddConfigurationTrigger, NiddConfigurationTriggerReply
 from .utils import scenario

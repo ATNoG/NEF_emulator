@@ -16,16 +16,22 @@ from enum import Enum
 #DurationSec - int -> ge = 0
 #DayOfWeek ???
 #TimeOfDay ???
+#DurationSecRm ???
+#DurationSecRo ???
 
 #TODO:
 #29.571
 #SupportedFeatures
+#Dnai
+#TypeAllocationCode
+#Gpsi
 
 #TODO:
 #29.122
 #WebsockNotifConfig
 #LocationArea
 #LocationArea5G
+#ConfigResult
 
 
 class Snssai(BaseModel):
