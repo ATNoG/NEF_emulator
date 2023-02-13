@@ -56,7 +56,7 @@ def read_subscription(
     http_request: Request
 ) -> Any:
     endpoint = http_request.scope['route'].path 
-    tools.reports.update_report(scsAsId, endpoint, "GET", subs_id=transactionId)
+    tools.reports.update_report(scsAsId, endpoint, "GET", trans_id=transactionId)
     pass
 
 
@@ -71,7 +71,7 @@ def update_subscription(
 ) -> Any:
     endpoint = http_request.scope['route'].path 
     json_item = jsonable_encoder(item_in)
-    tools.reports.update_report(scsAsId, endpoint, "PUT", json_item, transactionId)
+    tools.reports.update_report(scsAsId, endpoint, "PUT", json_item, trans_id=transactionId)
     pass
 
 @router.delete("/{scsAsId}/transactions/{transactionId}", response_model=schemas.ChargeableParty)
@@ -83,5 +83,5 @@ def delete_subscription(
     http_request: Request
 ) -> Any:
     endpoint = http_request.scope['route'].path 
-    tools.reports.update_report(scsAsId, endpoint, "DELETE", subs_id=transactionId)
+    tools.reports.update_report(scsAsId, endpoint, "DELETE", trans_id=transactionId)
     pass
