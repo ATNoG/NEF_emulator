@@ -1,0 +1,8 @@
+74c2ed5fa82cc1148a35c3a4108718ba	sample_vnf_ee/vnfd.yaml
+1f78427db9f00db44efcf370ebed873d	sample_vnf_ee/cloud_init/cloud-config.txt
+7ca4a7004f5ae20d7ee9e3913fcc95be	sample_vnf_ee/helm-charts/eechart/Chart.yaml
+f8a26aa767d2d10567c8ef19f962747d	sample_vnf_ee/helm-charts/eechart/values.yaml
+800e119dd46ffba79b378e63ad8196a3	sample_vnf_ee/helm-charts/eechart/templates/deployment.yaml
+2b1d25a7a5d83d4a98c586bd8b45d629	sample_vnf_ee/helm-charts/eechart/templates/service.yaml
+63caaa1e85262d2067851dd404425c29	sample_vnf_ee/helm-charts/eechart/templates/configmap.yaml
+472cbf1be8975ebf5b6112670d159fd9	sample_vnf_ee/helm-charts/eechart/templates/_helpers.tpl

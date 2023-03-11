@@ -1,0 +1,44 @@
+- name: My first play
+  hosts: all
+  become: yes
+  vars: 
+    aux_dir: /home/ubuntu/aux_files
+    SystemdDir: "/etc/systemd/system"
+    REPORT_API_IP: "10.0.12.168"
+    REPORT_API_PORT: 8000
+  tasks:
+    - name: Update package database
+      ansible.builtin.apt:
+        update_cache: true
+        force_apt_get: yes
+    - name: Download get-pip.py
+      get_url:
+          url: https://bootstrap.pypa.io/get-pip.py
+          dest: /tmp/get-pip.py
+    - name: Install pip
+      shell: python3 /tmp/get-pip.py
+
+    - name: Ensure auxiliar files directory exists
+      file:
+        path: "{{ aux_dir }}"
+        state: directory
+
+    - name: Synchronize local directory with remote host
+      copy:
+        src: "{{ playbook_dir }}/"
+        dest: "{{ aux_dir }}/"
+    - name: Install Pip Packages
+      ansible.builtin.pip:
+        requirements: "{{ aux_dir }}/requirements.txt"
+        state: present
+    - name: Write template
+      template:
+        src: "{{ playbook_dir }}/env.j2"
+        dest: "{{ aux_dir }}/.env"
+        force: true
+    - name: Create Systemd  
+      shell: 'echo -e "[Unit]\\nDescription=NEF Testing \\nAfter=network.target\\n\\n[Service]\\nUser=root\\nType=simple\\nWorkingDirectory=/home/ubuntu/aux_files\\nExecStart=/usr/bin/python3 ./main.py\\nStandardOutput=journal\\n\\n[Install]\\nWantedBy=multi-user.target" | sudo tee /etc/systemd/system/nef_tests.service'
+    - name: Enable daemons
+      shell: systemctl daemon-reload && systemctl enable nef_tests 
+    - name: Start API
+      shell: systemctl start nef_tests
