@@ -1,0 +1,15 @@
+# @Author: Daniel Gomes
+# @Date:   2023-02-02 15:20:05
+# @Last Modified by:   Daniel Gomes
+# @Last Modified time: 2023-02-03 09:40:32
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ .Values.deployment.name }}
+  ports:
+    - port: {{ .Values.service.grcp.service_port }}
+      targetPort: {{ .Values.service.grcp.container_port }}

@@ -1,0 +1,10 @@
+additionalParamsForVnf:
+  - member-vnf-index: 'simple'
+    additionalParams:
+      ssh_username: 'ubuntu'
+      ssh_password: 'password'
+      report_api_ip: '10.0.30.165'
+      report_api_port: '8000'
+      report_file_name: 'test.json'
+      nef_ip: '10.0.30.165'
+      nef_port: '8888'

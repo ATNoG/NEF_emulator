@@ -1,0 +1,40 @@
+# @Author: Daniel Gomes
+# @Date:   2023-02-02 15:20:05
+# @Last Modified by:   Daniel Gomes
+# @Last Modified time: 2023-02-03 15:51:07
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.deployment.name }}
+  labels:
+    app: {{ .Values.deployment.name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.deployment.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.deployment.name }}
+    spec:
+      containers:
+      - name: {{ .Values.deployment.grcp.name }}
+        image: {{ .Values.deployment.grcp.image }}:{{ .Values.deployment.grcp.version }}
+        ports:
+          - containerPort: {{ .Values.service.grcp.container_port }}
+        imagePullPolicy: {{ .Values.deployment.grcp.pull_policy }}
+        volumeMounts:
+        - name: osm-ee
+          mountPath: /app/storage
+        - name: osm-ee-source
+          mountPath: /app/EE/osm_ee/vnf
+      imagePullSecrets:
+      - name: harborkey
+      volumes:
+      - name: osm-ee-source
+        configMap: 
+          name:  {{ include "eechart.fullname" . }}
+      - name: osm-ee
+        emptyDir:
+          sizeLimit: 500Mi

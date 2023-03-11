@@ -6,6 +6,7 @@ from .paths import router
 from .gNB import router
 from .Cell import router
 from .UE import router
+from .testReport import router
 from .qosInformation import router
 from .qosMonitoring import router
 from .monitoringevent import router

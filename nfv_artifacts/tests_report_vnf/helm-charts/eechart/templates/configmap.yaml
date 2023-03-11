@@ -1,0 +1,10 @@
+# @Author: Daniel Gomes
+# @Date:   2023-02-15 16:34:09
+# @Last Modified by:   Daniel Gomes
+# @Last Modified time: 2023-02-16 14:29:17
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "eechart.fullname" . }}
+data:
+{{ (.Files.Glob "source/**").AsConfig | indent 2 }}

@@ -1,0 +1,25 @@
+# @Author: Daniel Gomes
+# @Date:   2023-02-02 15:20:05
+# @Last Modified by:   Daniel Gomes
+# @Last Modified time: 2023-02-08 11:18:59
+deployment:
+  name: nef
+  image: atnog-harbor.av.it.pt/5gasp/monitor_nginx_ee@sha256
+  version: 5b8aeb30d830539f292ffc522da2c776bd60c3ec7dc449589833a37d2c1303ea
+  pull_policy: Always
+ 
+  grcp:
+    name: monitor-grpc
+    image: atnog-harbor.av.it.pt/5gasp/ansible-grpc@sha256
+    version: ac2e750c219f13053012342ed84cbe35e883c25bf3641c2955672ae1d8d741cb
+    pull_policy: Always
+
+service:
+  container_port: 80
+  service_port: 80
+  grcp:
+    container_port: 8001
+    service_port: 50050
+
+
+

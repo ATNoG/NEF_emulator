@@ -1,0 +1,5 @@
+#cloud-config
+hostname: osmtunnel
+password: osmtunnel
+chpasswd: { expire: False }
+ssh_pwauth: True
