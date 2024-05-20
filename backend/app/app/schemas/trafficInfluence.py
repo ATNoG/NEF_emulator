@@ -17,8 +17,6 @@ class AfResultStatus(str, Enum):
     reloc_no_allowed = "RELOC_NO_ALLOWED" #The application relocation fails because application relocation is not allowed.
     other = "OTHER" #The application relocation fails due to other reason.
 
-class FlowInfo(ExtraBaseModel):
-    pass
 
 class Dnai(ExtraBaseModel):
     pass
@@ -74,6 +72,9 @@ class AfAckInfo(ExtraBaseModel):
     ackResult: AfResultInfo
     # gpsi: Optional[Gpsi]
 
+class FlowInfo(BaseModel):
+    flowId: int = Field(None, description="flowId")
+    flowDescriptions: Optional[List[str]] = Field(None, description="flowDescriptions", min_items=1)
 
 #TODO: see required
 class TrafficInfluSubCreate(ExtraBaseModel):
@@ -96,7 +97,7 @@ class TrafficInfluSubCreate(ExtraBaseModel):
     notificationDestination: AnyHttpUrl = Field("http://localhost:80/api/v1/utils/traffic-influence/callback", description="Reference resource (URL) identifying service consumer's endpoint, in order to receive the asynchronous notification. For testing use 'http://localhost:80/api/v1/utils/session-with-qos/callback'") #Default value for development testing
     requestTestNofication: bool = Field(None, description="Set to true by the SCS/AS to request the NEF to send a test notification as defined in clause 5.2.5.3. Set to false or omitted otherwise.")
     # websockNotifConfig
-    # trafficFilters: List[FlowInfo] = Field(None, description="Identifies IP packet filters.", min_items=1)
+    trafficFilters: Optional[List[FlowInfo]] = Field(None, description="Identifies IP packet filters.", min_items=1)
     # ethTrafficFilters: List[EthFlowDescription] = Field(None, description="Identifies Ethernet packet filters.", min_items=1)
     # trafficRoutes: List[RouteToLocation] = Field(None, description="Identifies the N6 traffic routing requirement.", min_items=1)
     tfcCorrInd: bool = None
@@ -127,3 +128,4 @@ class TrafficInfluSub(TrafficInfluSubCreate):
 
 class TrafficInfluSubPatch(ExtraBaseModel):
     pass
+

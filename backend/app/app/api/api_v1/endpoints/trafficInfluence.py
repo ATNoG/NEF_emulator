@@ -10,6 +10,8 @@ from app.api import deps
 from app.crud import crud_mongo, user, ue
 from app.db.session import client
 from .utils import add_notifications
+from app.core.config import trafficInfluenceSettings
+
 
 router = APIRouter()
 db_collection= 'TrafficInfluence'
@@ -25,8 +27,15 @@ def read_active_subscriptions(
     Read all active subscriptions
     """ 
     db_mongo = client.fastapi
-    retrieved_docs = crud_mongo.read_all(db_mongo, db_collection, current_user.id)
-
+    
+    # Filter the subscriptions related with the afID
+    retrieved_docs = [
+        doc
+        for doc
+        in crud_mongo.read_all(db_mongo, db_collection, current_user.id)
+        if doc["afId"] == afId
+    ]
+    
     #Check if there are any active subscriptions
     if not retrieved_docs:
         raise HTTPException(status_code=404, detail="There are no active subscriptions")
@@ -56,22 +65,49 @@ def create_subscription(
     Create new subscription.
     """
     db_mongo = client.fastapi
+    
     json_data = jsonable_encoder(item_in)
     json_data.update({'owner_id' : current_user.id})
-
+    json_data.update({'afId' : afId})
+    
     inserted_doc = crud_mongo.create(db_mongo, db_collection, json_data)
-
+    
     #Create the reference resource and location header
-    link = str(http_request.url) + '/' + str(inserted_doc.inserted_id)
+    link = str(http_request.url.path) + '/' + str(inserted_doc.inserted_id)
     response_header = {"location" : link}
 
     #Update the subscription with the new resource (link) and return the response (+response header)
-    crud_mongo.update_new_field(db_mongo, db_collection, inserted_doc.inserted_id, {"link" : link})
+    crud_mongo.update_new_field(
+        db_mongo,
+        db_collection,
+        inserted_doc.inserted_id,
+        {
+            "link" : link,
+            "id": str(inserted_doc.inserted_id)
+        }
+    )
     
     #Retrieve the updated document | UpdateResult is not a dict
     updated_doc = crud_mongo.read_uuid(db_mongo, db_collection, inserted_doc.inserted_id)
-
     updated_doc.pop("owner_id") #Remove owner_id from the response
+    
+    # Dynamic Slicing
+    if item_in.snssai and item_in.trafficFilters:
+        sst = item_in.snssai.sst
+        flowd_id = item_in.trafficFilters[0].flowId
+        
+        # Select the Profile
+        traffic_filters = trafficInfluenceSettings\
+            .traffic_influence_characteristics["traffic_filters_mapping"]
+        slice_profile = traffic_filters[f"sst-{sst}:flowid-{flowd_id}"]
+        
+        print(f"Will Apply the slice profile {slice_profile}")
+        
+        # Todo: Make Request to Network Slice
+        
+        # if everything went accordingly and the slicing api returns a 200
+        updated_doc["sliceProfileApplied"] = True
+        
 
     http_response = JSONResponse(content=updated_doc, status_code=201, headers=response_header)
     add_notifications(http_request, http_response, False)
@@ -90,6 +126,7 @@ def read_subscription(
     Get subscription by id
     """
     db_mongo = client.fastapi
+    
 
     try:
         retrieved_doc = crud_mongo.read_uuid(db_mongo, db_collection, subscriptionId)
@@ -97,7 +134,7 @@ def read_subscription(
         raise HTTPException(status_code=400, detail='Please enter a valid uuid (24-character hex string)')
     
     #Check if the document exists
-    if not retrieved_doc:
+    if not retrieved_doc or retrieved_doc['afId'] != afId:
         raise HTTPException(status_code=404, detail="Subscription not found")
     #If the document exists then validate the owner
     if not user.is_superuser(current_user) and (retrieved_doc['owner_id'] != current_user.id):
@@ -107,6 +144,7 @@ def read_subscription(
     http_response = JSONResponse(content=retrieved_doc, status_code=200)
     add_notifications(http_request, http_response, False)
     return http_response
+
 
 @router.put("/{afId}/subscriptions/{subscriptionId}", response_model=schemas.TrafficInfluSub)
 def update_subscription(
@@ -141,9 +179,11 @@ def update_subscription(
     #Retrieve the updated document | UpdateResult is not a dict
     updated_doc = crud_mongo.read_uuid(db_mongo, db_collection, subscriptionId)
     updated_doc.pop("owner_id")
+    
     http_response = JSONResponse(content=updated_doc, status_code=200)
     add_notifications(http_request, http_response, False)
     return http_response
+
 
 @router.delete("/{afId}/subscriptions/{subscriptionId}", response_model=schemas.TrafficInfluSub)
 def delete_subscription(

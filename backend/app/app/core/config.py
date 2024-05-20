@@ -109,3 +109,16 @@ class QoSSettings():
         return self._qos_characteristics
 
 qosSettings = QoSSettings()
+
+class TrafficInfluenceSettings():
+
+    def __init__(self) -> None:
+        self.import_json()
+    
+    def import_json(self):
+        with open('app/core/config/TrafficInfluenceCharacteristics.json') as json_file:
+            data = json.load(json_file)        
+            self.traffic_influence_characteristics = data
+
+
+trafficInfluenceSettings = TrafficInfluenceSettings()
