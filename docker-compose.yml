@@ -90,6 +90,7 @@ services:
     volumes:
       - ./backend/app:/app
       - shared-data:/shared
+      - ./TrafficInfluenceCharacteristics.json:/app/app/core/config/TrafficInfluenceCharacteristics.json
     env_file:
       - .env
     environment:

@@ -1,12 +1,12 @@
 {
-    "dynamic_slicing_api_base_url": "http://10.10.10.10:9000",
+    "dynamic_slicing_api_base_url": "http://10.16.10.74:8000",
     "dynamic_slicing_api_payload": {
         "administrative_state": "UNLOCKED",
         "operational_state": "ENABLED"
     },
     "traffic_filters_mapping": {
-        "sst-1:flowid-1": "SliceProfile1",
-        "sst-1:flowid-2": "SliceProfile2",
+        "sst-1:flowid-1": "5GASPHigh",
+        "sst-1:flowid-2": "5GASPLow",
         "sst-2:flowid-1": "SliceProfile3",
         "sst-2:flowid-2": "SliceProfile4"
     }

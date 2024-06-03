@@ -11,6 +11,38 @@ from app.crud import crud_mongo, user, ue
 from app.db.session import client
 from .utils import add_notifications
 from app.core.config import trafficInfluenceSettings
+import requests
+import json
+
+def update_slice_qos(base_url, payload, slice_profile):
+    
+    url = f"{base_url}/productOrder/{slice_profile}/patch"
+    payload = json.dumps(payload)
+    headers = {
+      'Content-Type': 'application/json'
+    }
+    
+    try:
+        print("Sending PATCH request to the server...")
+        print("Slice Profile:", slice_profile)
+        response = requests.patch(
+            url,
+            headers=headers,
+            data=payload,
+            timeout=45
+        )
+        
+        print(f"Response received. Status code: {response.status_code}")
+        if response.status_code == 200:
+            print("Request was successful.")
+            print(f"The profile {slice_profile} was enforced with SUCCESS!")
+            return True
+        else:
+            print(f"Request failed. Status code: {response.status_code}")
+            return False
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred: {e}")
+        return False
 
 
 router = APIRouter()
@@ -83,13 +115,10 @@ def create_subscription(
         inserted_doc.inserted_id,
         {
             "link" : link,
-            "id": str(inserted_doc.inserted_id)
+            "id": str(inserted_doc.inserted_id),
+            "sliceProfileApplied" : None
         }
     )
-    
-    #Retrieve the updated document | UpdateResult is not a dict
-    updated_doc = crud_mongo.read_uuid(db_mongo, db_collection, inserted_doc.inserted_id)
-    updated_doc.pop("owner_id") #Remove owner_id from the response
     
     # Dynamic Slicing
     if item_in.snssai and item_in.trafficFilters:
@@ -101,16 +130,40 @@ def create_subscription(
             .traffic_influence_characteristics["traffic_filters_mapping"]
         slice_profile = traffic_filters[f"sst-{sst}:flowid-{flowd_id}"]
         
+        # API Location and Payload
+        slice_api_url = trafficInfluenceSettings\
+            .traffic_influence_characteristics["dynamic_slicing_api_base_url"]
+            
+        slice_api_payload = trafficInfluenceSettings\
+            .traffic_influence_characteristics["dynamic_slicing_api_payload"]
+        
+        
+        
+        request_status_code = 400
         print(f"Will Apply the slice profile {slice_profile}")
-        
-        # Todo: Make Request to Network Slice
-        
-        # if everything went accordingly and the slicing api returns a 200
-        updated_doc["sliceProfileApplied"] = True
-        
+        if update_slice_qos(slice_api_url, slice_api_payload, slice_profile):
+            request_status_code = 201
+            crud_mongo.update_new_field(
+                db_mongo,
+                db_collection,
+                inserted_doc.inserted_id,
+                {
+                    "sliceProfileApplied" : slice_profile,
+                }
+            )
 
-    http_response = JSONResponse(content=updated_doc, status_code=201, headers=response_header)
-    add_notifications(http_request, http_response, False)
+    #Retrieve the updated document | UpdateResult is not a dict
+    updated_doc = crud_mongo.read_uuid(db_mongo, db_collection, inserted_doc.inserted_id)
+    updated_doc.pop("owner_id") #Remove owner_id from the response
+    
+    http_response = JSONResponse(
+        content=updated_doc,
+        status_code=request_status_code,
+        headers=response_header
+    )
+    
+    if request_status_code == 201:
+        add_notifications(http_request, http_response, False)
 
     return http_response
 
