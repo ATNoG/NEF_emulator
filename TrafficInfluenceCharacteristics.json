@@ -1,5 +1,7 @@
 {
     "dynamic_slicing_api_base_url": "http://10.16.10.74:8000",
+    "dynamic_slicing_api_username": "admin",
+    "dynamic_slicing_api_password": "password",
     "dynamic_slicing_api_payload": {
         "administrative_state": "UNLOCKED",
         "operational_state": "ENABLED"

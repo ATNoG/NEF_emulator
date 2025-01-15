@@ -14,10 +14,11 @@ from app.core.config import trafficInfluenceSettings
 import requests
 import json
 
-def update_slice_qos(base_url, payload, slice_profile):
+def update_slice_qos(base_url, username, password, payload, slice_profile):
     
     url = f"{base_url}/productOrder/{slice_profile}/patch"
     payload = json.dumps(payload)
+    auth = (username, password)
     headers = {
       'Content-Type': 'application/json'
     }
@@ -28,6 +29,7 @@ def update_slice_qos(base_url, payload, slice_profile):
         response = requests.patch(
             url,
             headers=headers,
+            auth=auth,
             data=payload,
             timeout=45
         )
@@ -137,11 +139,21 @@ def create_subscription(
         slice_api_payload = trafficInfluenceSettings\
             .traffic_influence_characteristics["dynamic_slicing_api_payload"]
         
+        slice_api_username = trafficInfluenceSettings\
+            .traffic_influence_characteristics["dynamic_slicing_api_username"]
+        
+        slice_api_password = trafficInfluenceSettings\
+            .traffic_influence_characteristics["dynamic_slicing_api_password"]
+        
+        
         
         
         request_status_code = 400
         print(f"Will Apply the slice profile {slice_profile}")
-        if update_slice_qos(slice_api_url, slice_api_payload, slice_profile):
+        if update_slice_qos(
+            slice_api_url, slice_api_username, slice_api_password, 
+            slice_api_payload, slice_profile
+        ):
             request_status_code = 201
             crud_mongo.update_new_field(
                 db_mongo,
