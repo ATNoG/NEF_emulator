@@ -1,10 +1,14 @@
-import logging, asyncio, time, requests
-from typing import Any, Literal, Optional
-
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path
+import threading, logging, time, requests
+from app.models.UE import UE
+from fastapi import APIRouter, Path, Depends, HTTPException
 from fastapi.encoders import jsonable_encoder
-
-from app import crud, models, tools
+from typing import Any, Literal, Optional
+from app import crud, tools, models
+from app.crud import crud_mongo
+from app.tools.distance import check_distance
+from app.tools.rsrp_calculation import check_rsrp, check_path_loss
+from app.tools import qos_callback
+from app.db.session import SessionLocal, client
 from app.api import deps
 from app.crud import crud_mongo
 from app.db.session import SessionLocal, client
@@ -28,6 +32,7 @@ from app.core.notification_responder import notification_responder
 from app.tools import monitoring_callbacks, qos_callback, timer
 from app.tools.distance import check_distance
 from app.tools.rsrp_calculation import check_path_loss, check_rsrp
+from fastapi import BackgroundTasks
 
 # Dictionary holding threads that are running per user id.
 threads = {}
@@ -158,8 +163,6 @@ async def location_notification(
         if not sub_validate_time or not sub_validate_number_of_reports:
             crud_mongo.delete_by_uuid(db_mongo, "MonitoringEvent", sub.get("_id"))
             continue
-
-        monitoringType = sub["monitoringType"]
 
         if monitoringType == "LOCATION_REPORTING":
             await handle_location_report_callback(sub, ue)
@@ -296,6 +299,79 @@ def update_location(
     background_tasks.add_task(location_notification, ue)
 
     return {"msg": "Location updated"}
+
+
+moving_devices = dict()
+
+Speed = Literal["HIGH", "LOW"]
+
+
+def increment_position(speed: Speed) -> int:
+    if speed == "LOW":
+        return 1
+
+    if speed == "HIGH":
+        return 10
+
+
+def validate_ue(*, ue: Optional[UE], user: models.User, db) -> Optional[UE]:
+    if not ue:
+        logging.warning("UE not found")
+        return None
+
+    if ue.owner_id != user.id:
+        logging.warning("Not enough permissions")
+        return None
+
+    path = crud.path.get(db=db, id=ue.path_id)
+    if not path:
+        logging.warning("Path not found")
+        return None
+
+    if path.owner_id != user.id:
+        logging.warning("Not enough permissions")
+        return None
+
+    return ue
+
+
+def movement_loop(supi: str, user: models.User):
+    db = SessionLocal()
+    ue = validate_ue(ue=crud.ue.get_supi(db=db, supi=supi), user=user, db=db)
+
+    if ue is None:
+        moving_devices.pop(supi)
+        return
+
+    points = crud.points.get_points(db=db, path_id=ue.path_id)
+
+    # Assume end of path
+    current_position_index = -1
+
+    # Find current position if one exists
+    for index, point in enumerate(points):
+        if (ue.latitude == point.latitude) and (ue.longitude == point.longitude):
+            current_position_index = index
+            break
+
+    while True:
+        if supi not in moving_devices:
+            break
+
+        current_position_index += increment_position(ue.speed) % len(points)
+        point = points[current_position_index]
+
+        ue = crud.ue.update_coordinates(
+            db=db, lat=point.latitude, long=point.longitude, db_obj=ue
+        )
+
+        location_notification(ue)
+
+        time.sleep(1)
+
+
+def location_notification(ue: UE):
+    pass
 
 
 @router.post("/start-loop", status_code=200)
