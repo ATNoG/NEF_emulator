@@ -343,6 +343,7 @@ def movement_loop(supi: str, user: models.User):
 
     # Assume end of path
     current_position_index = -1
+    cells = jsonable_encoder(crud.cell.get_multi_by_owner(db=db, owner_id=user.id))
 
     # Find current position if one exists
     for index, point in enumerate(points):
@@ -357,9 +358,22 @@ def movement_loop(supi: str, user: models.User):
         current_position_index += increment_position(ue.speed) % len(points)
         point = points[current_position_index]
 
+        cell_now, cell_distances = check_distance(
+            point.latitude, point.longitude, cells
+        )
+
         ue = crud.ue.update_coordinates(
             db=db, lat=point.latitude, long=point.longitude, db_obj=ue
         )
+
+        logging.info("The current cell is %d", cell_now)
+        if cell_now and ue.Cell_id != cell_now.get("id"):
+            ue.Cell_id = cell_now.get("id")
+            crud.ue.update(
+                db=db,
+                db_obj=ue,
+                obj_in={"Cell_id": ue.Cell_id},
+            )
 
         location_notification(ue)
 
@@ -414,20 +428,17 @@ def handle_location_report_callback(location_reporting_sub, ue: UE):
             location_reporting_sub.get("notificationDestination"),
             location_reporting_sub.get("link"),
         )
-        location_reporting_sub.update(
-            {
-                "maximumNumberOfReports": location_reporting_sub.get(
-                    "maximumNumberOfReports"
-                )
-                - 1
-            }
-        )
-        crud_mongo.update(
-            db_mongo,
-            "MonitoringEvent",
-            location_reporting_sub.get("_id"),
-            location_reporting_sub,
-        )
+
+        maxReports = location_reporting_sub.get("maximumNumberOfReports")
+
+        if maxReports:
+            location_reporting_sub.update({"maximumNumberOfReports": maxReports - 1})
+            crud_mongo.update(
+                db_mongo,
+                "MonitoringEvent",
+                location_reporting_sub.get("_id"),
+                location_reporting_sub,
+            )
 
     except requests.exceptions.ConnectionError as ex:
         logging.warning("Failed to send the callback request with error %d", ex)
