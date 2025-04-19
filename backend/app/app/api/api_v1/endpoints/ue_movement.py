@@ -1,8 +1,12 @@
 import threading, logging, time, requests
+<<<<<<< HEAD
 from app.models.UE import UE
 from fastapi import APIRouter, Path, Depends, HTTPException
 from fastapi.encoders import jsonable_encoder
 from typing import Any, Literal, Optional
+from fastapi import APIRouter, Path, Depends, HTTPException, BackgroundTasks
+from fastapi.encoders import jsonable_encoder
+from typing import Any 
 from app import crud, tools, models
 from app.crud import crud_mongo
 from app.tools.distance import check_distance
@@ -14,7 +18,10 @@ from app.schemas import Msg
 from app.schemas.afSessionWithQos import AsSessionWithQoSSubscription
 from app.tools import monitoring_callbacks, timer
 
-from fastapi import BackgroundTasks
+from app.schemas.UE import UE
+
+from app.schemas.monitoringevent import Point
+from app.tools import monitoring_callbacks, timer
 
 # Dictionary holding threads that are running per user id.
 threads = {}
@@ -37,9 +44,8 @@ handovers = {}
 # channel = connection.channel()
 # channel.queue_declare(queue='my_queue')
 
-# TODO: Remove this
 
-class BackgroundTasks(threading.Thread):
+class BackgroundTask(threading.Thread):
 
     def __init__(self, group=None, target=None, name=None, args=(), kwargs=None):
         super().__init__(group=group, target=target, name=name)
@@ -64,13 +70,6 @@ class BackgroundTasks(threading.Thread):
         try:
             db_mongo = client.fastapi
 
-            # Connect to broker
-
-            # connection = pika.BlockingConnection(pika.ConnectionParameters('rabbitmq'))
-            # channel = connection.channel()
-            # channel.queue_declare(queue='my_queue')
-
-            # Initiate UE - if exists
             UE = crud.ue.get_supi(db=self._db, supi=supi)
             if not UE:
                 logging.warning("UE not found")
@@ -267,9 +266,6 @@ class BackgroundTasks(threading.Thread):
                                 db_mongo,
                                 "MonitoringEvent",
                                 loss_of_connectivity_sub.get("_id"),
-                            )
-                            active_subscr_iptions.update(
-                                {"loss_of_connectivity": False}
                             )
                             continue
                     else:
@@ -545,61 +541,6 @@ class BackgroundTasks(threading.Thread):
                         rt.stop()
                     break
 
-            # End of 2nd Approach for updating UEs position
-
-            """
-            ===================================================================
-                             1st Approach for updating UEs position
-            ===================================================================
-
-            Summary: while(TRUE) --> keep iterating the points list again and again
-
-
-                points [ 1 2 3 4 5 6 7 8 9 10 ... ] . . . . . . .
-                               ^ point
-                           ^ flag
-                 
-            flag:    it is used once to find the current UE position and then is
-                     set to False
-            
-            Sleep/   
-            Speed:   LOW : sleeps   1 sec and goes to the next point  (1m/sec)
-                     HIGH: sleeps 0.1 sec and goes to the next point (10m/sec)
-
-            Pros:    + the UEs goes over every point and never skips any
-            Cons:    - updating the UE position every 0.1 sec is a more aggressive approach
-
-            -------------------------------------------------------------------
-            """
-
-            # flag = True
-
-            # while True:
-            #     for point in points:
-
-            #         #Iteration to find the last known coordinates of the UE
-            #         #Then the movements begins from the last known position (geo coordinates)
-            #         if ((UE.latitude != point["latitude"]) or (UE.longitude != point["longitude"])) and flag == True:
-            #             continue
-            #         elif (UE.latitude == point["latitude"]) and (UE.longitude == point["longitude"]) and flag == True:
-            #             flag = False
-            #             continue
-
-            #         #-----------------------Code goes here-------------------------#
-
-            #         if UE.speed == 'LOW':
-            #             time.sleep(1)
-            #         elif UE.speed == 'HIGH':
-            #             time.sleep(0.1)
-
-            #         if self._stop_threads:
-            #             print("Stop moving...")
-            #             break
-
-            #     if self._stop_threads:
-            #             print("Terminating thread...")
-            #             break
-
         except Exception as ex:
             logging.critical(ex)
 
@@ -680,7 +621,142 @@ def movement_loop(supi: str, user: models.User):
 
 
 def location_notification(ue: UE):
+    db_mongo = client.fastapi
+    subscriptions = crud_mongo.read_all_by_multiple_pairs(
+        db_mongo,
+        "MonitoringEvent",
+        externalId=ue.external_identifier,
+    )
+
+    for sub in subscriptions:
+        sub_validate_time = tools.check_expiration_time(
+            expire_time=sub.get("monitorExpireTime")
+        )
+
+        sub_validate_number_of_reports = tools.check_numberOfReports(
+            sub.get("maximumNumberOfReports")
+        )
+
+        if not sub_validate_time or not sub_validate_number_of_reports:
+            crud_mongo.delete_by_uuid(db_mongo, "MonitoringEvent", sub.get("_id"))
+            continue
+
+        if sub.monitoringType == "LOCATION_REPORTING":
+            handle_location_report_callback(sub, ue)
+
+        elif sub.monitoringType == "LOSS_OF_CONNECTIVITY":
+            handle_loss_connectivity_callback(sub, ue)
+
+        elif sub.monitoringType == "UE_REACHABILITY":
+            handle_ue_reachability_callback(sub, ue)
+
+
+def handle_location_report_callback(ue_reachability_sub, ue: UE):
+    db_mongo = client.fastapi
+    try:
+        monitoring_callbacks.ue_reachability_callback(
+            ue,
+            ue_reachability_sub.get("notificationDestination"),
+            ue_reachability_sub.get("link"),
+            ue_reachability_sub.get("reachabilityType"),
+        )
+
+        if ue_reachability_sub.maximumNumberOfReports:
+            ue_reachability_sub.update(
+                {
+                    "maximumNumberOfReports": ue_reachability_sub.get(
+                        "maximumNumberOfReports"
+                    )
+                    - 1
+                }
+            )
+
+            crud_mongo.update(
+                db_mongo,
+                "MonitoringEvent",
+                ue_reachability_sub.get("_id"),
+                ue_reachability_sub,
+            )
+
+    except requests.exceptions.ConnectionError as ex:
+        logging.warning(f"Failed to send the callback request with error {ex}")
+        crud_mongo.delete_by_uuid(
+            db_mongo,
+            "MonitoringEvent",
+            ue_reachability_sub.get("_id"),
+        )
+
+
+def handle_loss_connectivity_callback(loss_of_connectivity_sub, ue: UE):
+    db_mongo = client.fastapi
+    try:
+        elapsed_time = t.status()
+        if elapsed_time > loss_of_connectivity_sub.get("maximumDetectionTime"):
+            response = monitoring_callbacks.loss_of_connectivity_callback(
+                ue,
+                loss_of_connectivity_sub.get("notificationDestination"),
+                loss_of_connectivity_sub.get("link"),
+            )
+
+            logging.critical(response.json())
+            # This ack is used to send one time the loss of connectivity callback
+            loss_of_connectivity_ack = response.json().get("ack")
+
+            loss_of_connectivity_sub.update(
+                {
+                    "maximumNumberOfReports": loss_of_connectivity_sub.get(
+                        "maximumNumberOfReports"
+                    )
+                    - 1
+                }
+            )
+            crud_mongo.update(
+                db_mongo,
+                "MonitoringEvent",
+                loss_of_connectivity_sub.get("_id"),
+                loss_of_connectivity_sub,
+            )
+    except requests.exceptions.ConnectionError as ex:
+        logging.warning("Failed to send the callback request")
+        logging.warning(ex)
+        crud_mongo.delete_by_uuid(
+            db_mongo,
+            "MonitoringEvent",
+            loss_of_connectivity_sub.get("_id"),
+        )
+
+
+def handle_ue_reachability_callback(subscription, ue: UE):
     pass
+
+
+@router.post("/update_location/{supi}", status_code=200)
+def update_location(
+    *,
+    supi: str = Path(...),
+    new_location: Point,
+    background_tasks: BackgroundTasks,
+    current_user: models.User = Depends(deps.get_current_active_user),
+):
+    db = SessionLocal()
+    ue = crud.ue.get_supi(db, supi)
+
+    if not ue:
+        raise HTTPException(
+            status_code=404,
+            detail="No device found",
+        )
+
+    crud.ue.update_coordinates(
+        db,
+        lat=new_location.point.lat,
+        long=new_location.point.lon,
+        db_obj=ue,
+    )
+
+    # TODO: Send notifications related to location update
+
+    return {"msg": "Location updated"}
 
 
 @router.post("/start-loop", status_code=200)
