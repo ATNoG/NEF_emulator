@@ -1,12 +1,11 @@
 import threading, logging, time, requests
-<<<<<<< HEAD
 from app.models.UE import UE
 from fastapi import APIRouter, Path, Depends, HTTPException
 from fastapi.encoders import jsonable_encoder
 from typing import Any, Literal, Optional
 from fastapi import APIRouter, Path, Depends, HTTPException, BackgroundTasks
 from fastapi.encoders import jsonable_encoder
-from typing import Any 
+from typing import Any
 from app import crud, tools, models
 from app.crud import crud_mongo
 from app.tools.distance import check_distance
@@ -641,93 +640,58 @@ def location_notification(ue: UE):
             crud_mongo.delete_by_uuid(db_mongo, "MonitoringEvent", sub.get("_id"))
             continue
 
-        if sub.monitoringType == "LOCATION_REPORTING":
+        monitoringType = sub["monitoringType"]
+
+        if monitoringType == "LOCATION_REPORTING":
             handle_location_report_callback(sub, ue)
 
-        elif sub.monitoringType == "LOSS_OF_CONNECTIVITY":
+        elif monitoringType == "LOSS_OF_CONNECTIVITY":
             handle_loss_connectivity_callback(sub, ue)
 
-        elif sub.monitoringType == "UE_REACHABILITY":
+        elif monitoringType == "UE_REACHABILITY":
             handle_ue_reachability_callback(sub, ue)
 
 
-def handle_location_report_callback(ue_reachability_sub, ue: UE):
+def handle_location_report_callback(location_reporting_sub, ue: UE):
     db_mongo = client.fastapi
     try:
-        monitoring_callbacks.ue_reachability_callback(
-            ue,
-            ue_reachability_sub.get("notificationDestination"),
-            ue_reachability_sub.get("link"),
-            ue_reachability_sub.get("reachabilityType"),
+        logging.info(
+            "Attempting to send the callback to %d",
+            location_reporting_sub.get("notificationDestination"),
         )
-
-        if ue_reachability_sub.maximumNumberOfReports:
-            ue_reachability_sub.update(
-                {
-                    "maximumNumberOfReports": ue_reachability_sub.get(
-                        "maximumNumberOfReports"
-                    )
-                    - 1
-                }
-            )
-
-            crud_mongo.update(
-                db_mongo,
-                "MonitoringEvent",
-                ue_reachability_sub.get("_id"),
-                ue_reachability_sub,
-            )
-
-    except requests.exceptions.ConnectionError as ex:
-        logging.warning(f"Failed to send the callback request with error {ex}")
-        crud_mongo.delete_by_uuid(
+        print(
+            f"Attempting to send the callback to {location_reporting_sub.get('notificationDestination')}"
+        )
+        monitoring_callbacks.location_callback(
+            jsonable_encoder(ue),
+            location_reporting_sub.get("notificationDestination"),
+            location_reporting_sub.get("link"),
+        )
+        location_reporting_sub.update(
+            {
+                "maximumNumberOfReports": location_reporting_sub.get(
+                    "maximumNumberOfReports"
+                )
+                - 1
+            }
+        )
+        crud_mongo.update(
             db_mongo,
             "MonitoringEvent",
-            ue_reachability_sub.get("_id"),
+            location_reporting_sub.get("_id"),
+            location_reporting_sub,
         )
+
+    except requests.exceptions.ConnectionError as ex:
+        logging.warning("Failed to send the callback request with error %d", ex)
 
 
 def handle_loss_connectivity_callback(loss_of_connectivity_sub, ue: UE):
-    db_mongo = client.fastapi
-    try:
-        elapsed_time = t.status()
-        if elapsed_time > loss_of_connectivity_sub.get("maximumDetectionTime"):
-            response = monitoring_callbacks.loss_of_connectivity_callback(
-                ue,
-                loss_of_connectivity_sub.get("notificationDestination"),
-                loss_of_connectivity_sub.get("link"),
-            )
-
-            logging.critical(response.json())
-            # This ack is used to send one time the loss of connectivity callback
-            loss_of_connectivity_ack = response.json().get("ack")
-
-            loss_of_connectivity_sub.update(
-                {
-                    "maximumNumberOfReports": loss_of_connectivity_sub.get(
-                        "maximumNumberOfReports"
-                    )
-                    - 1
-                }
-            )
-            crud_mongo.update(
-                db_mongo,
-                "MonitoringEvent",
-                loss_of_connectivity_sub.get("_id"),
-                loss_of_connectivity_sub,
-            )
-    except requests.exceptions.ConnectionError as ex:
-        logging.warning("Failed to send the callback request")
-        logging.warning(ex)
-        crud_mongo.delete_by_uuid(
-            db_mongo,
-            "MonitoringEvent",
-            loss_of_connectivity_sub.get("_id"),
-        )
+    logging.error("There was an attempt at calling the connectivity callback")
 
 
 def handle_ue_reachability_callback(subscription, ue: UE):
-    pass
+    logging.error("There was an attempt at calling the reachability callback")
 
 
 @router.post("/update_location/{supi}", status_code=200)
@@ -747,7 +711,7 @@ def update_location(
             detail="No device found",
         )
 
-    crud.ue.update_coordinates(
+    ue = crud.ue.update_coordinates(
         db,
         lat=new_location.point.lat,
         long=new_location.point.lon,
@@ -755,6 +719,7 @@ def update_location(
     )
 
     # TODO: Send notifications related to location update
+    background_tasks.add_task(location_notification, ue)
 
     return {"msg": "Location updated"}
 
