@@ -100,7 +100,9 @@ def movement_loop(supi: str, user: models.User):
         if supi not in moving_devices:
             break
 
-        current_position_index += increment_position(ue.speed) % len(points)
+        current_position_index = (
+            increment_position(ue.speed) + current_position_index
+        ) % len(points)
         point = points[current_position_index]
 
         cell_now, cell_distances = check_distance(
