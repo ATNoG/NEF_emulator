@@ -101,9 +101,18 @@ def create_subscription(
     """
     db_mongo = client.fastapi
 
-    UE = ue.get_externalId(
-        db=db, externalId=str(item_in.externalId), owner_id=current_user.id
-    )
+    UE = None
+    if item_in.externalId:
+        UE = ue.get_externalId(
+            db=db, externalId=str(item_in.externalId), owner_id=current_user.id
+        )
+
+    # Because item_in puts default values to externalId and msisdn, even if none are specified.
+    # Therefore we need to check if we already have the UE
+    if not UE and item_in.msisdn:
+        print("searching for msisdn")
+        UE = ue.get_supi(db=db, supi=item_in.msisdn)
+
     if not UE:
         raise HTTPException(
             status_code=409, detail="UE with this external identifier doesn't exist"
@@ -130,20 +139,11 @@ def create_subscription(
         json_compatible_item_data["externalId"] = item_in.externalId
         json_compatible_item_data["ipv4Addr"] = UE.ip_address_v4
 
-        if UE.Cell != None:
-            # If ue is moving retieve ue's information from memory else retrieve info from db
-            if retrieve_ue_state(supi=UE.supi, user_id=current_user.id):
-                cell_id_hex = retrieve_ue(UE.supi).get("cell_id_hex")
-                gnb_id_hex = retrieve_ue(UE.supi).get("gnb_id_hex")
-                json_compatible_item_data["locationInfo"] = {
-                    "cellId": cell_id_hex,
-                    "gNBId": gnb_id_hex,
-                }
-            else:
-                json_compatible_item_data["locationInfo"] = {
-                    "cellId": UE.Cell.cell_id,
-                    "gNBId": UE.Cell.gNB.gNB_id,
-                }
+        if UE.Cell:
+            json_compatible_item_data["locationInfo"] = {
+                "cellId": UE.Cell.cell_id,
+                "gNBId": UE.Cell.gNB.gNB_id,
+            }
         else:
             json_compatible_item_data["locationInfo"] = {"cellId": None, "gNBId": None}
 

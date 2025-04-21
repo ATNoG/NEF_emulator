@@ -1020,7 +1020,10 @@ class MonitoringEventSubscriptionCreate(ExtraBaseModel):
         "123456789@domain.com",
         description="Globally unique identifier containing a Domain Identifier and a Local Identifier. \<Local Identifier\>@\<Domain Identifier\>",
     )
-    # msisdn: Optional[str] = Field("918369110173", description="Mobile Subscriber ISDN number that consists of Country Code, National Destination Code and Subscriber Number.")
+    msisdn: Optional[str] = Field(
+        "918369110173",
+        description="Mobile Subscriber ISDN number that consists of Country Code, National Destination Code and Subscriber Number.",
+    )
     # externalGroupId: Optional[str] = Field("Group1@domain.com", description="Identifies a group made up of one or more subscriptions associated to a group of IMSIs, containing a Domain Identifier and a Local Identifier. \<Local Identifier\>@\<Domain Identifier\>")
     # addExtGroupIds: Optional[str] = None
     # Remember, when you actually trying to access the database through CRUD methods you need to typecast the pydantic types to strings, int etc.
