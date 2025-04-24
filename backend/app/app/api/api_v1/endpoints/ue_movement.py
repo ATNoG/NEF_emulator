@@ -133,7 +133,7 @@ async def movement_loop(supi: str, user: models.User):
             ue, ue.Cell_id, cell_now.get("id") if cell_now else None
         )
 
-        time.sleep(1)
+        await asyncio.sleep(1)
 
 
 async def location_notification(
