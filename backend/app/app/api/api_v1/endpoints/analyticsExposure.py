@@ -280,13 +280,23 @@ def fetch_analytics(
     if not item_in.tgtUe.gpsi:
         raise HTTPException(status_code=501, detail="Not Implemented")
 
+    user_equipment = None
     try:
-        user_equipment = ue.get_supi(db, supi=item_in.tgtUe.gpsi)
+        tgtUe: str = item_in.tgtUe.gpsi
+        if tgtUe.startswith("msisdn-"):
+            user_equipment = ue.get_supi(db, supi=tgtUe.split("msisdn-")[1])
+
+        elif tgtUe.startswith("extid-"):
+            user_equipment = ue.get_externalId(
+                db, externalId=tgtUe.split("extid-")[1], owner_id=current_user.id
+            )
 
     except Exception as ex:
         raise HTTPException(status_code=404, detail="The current device was not found")
 
-    print(user_equipment)
+    if user_equipment is None:
+        raise HTTPException(status_code=404, detail="The current device was not found")
+
     point = Point(
         shape="POINT",
         point=GeographicalCoordinates(
