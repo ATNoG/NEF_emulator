@@ -1256,16 +1256,34 @@ class ServiceIdentity(ExtraBaseModel):
 
 class Fqdn(ExtraBaseModel):
     __root__: constr(
-        regex=r'^([0-9A-Za-z]([-0-9A-Za-z]{0,61}[0-9A-Za-z])?\.)+[A-Za-z]{2,63}\.?$',
+        regex=r"^([0-9A-Za-z]([-0-9A-Za-z]{0,61}[0-9A-Za-z])?\.)+[A-Za-z]{2,63}\.?$",
         min_length=4,
         max_length=253,
-    ) = Field(..., description='Fully Qualified Domain Name')
+    ) = Field(..., description="Fully Qualified Domain Name")
 
 
 class UpLocRepAddrAfRm(ExtraBaseModel):
     ipv4Addrs: Optional[List[Ipv4Addr]] = Field(None, min_items=1)
     ipv6Addrs: Optional[List[Ipv6Addr]] = Field(None, min_items=1)
     fqdn: Optional[Fqdn] = None
+
+
+class UpLocRepAddrAfRm2(BaseModel):
+    ipv4Addrs: Optional[List[Ipv4Addr]] = Field(None, min_items=1)
+    ipv6Addrs: List[Ipv6Addr] = Field(..., min_items=1)
+    fqdn: Optional[Fqdn] = None
+
+
+class UpLocRepAddrAfRm3(BaseModel):
+    ipv4Addrs: Optional[List[Ipv4Addr]] = Field(None, min_items=1)
+    ipv6Addrs: Optional[List[Ipv6Addr]] = Field(None, min_items=1)
+    fqdn: Fqdn
+
+
+class UpLocRepAddrAfRm(BaseModel):
+    __root__: Optional[
+        Union[UpLocRepAddrAfRm1, UpLocRepAddrAfRm2, UpLocRepAddrAfRm3]
+    ] = Field(None, description="Represents the user plane addressing information.")
 
 
 class CodeWord(ExtraBaseModel):
@@ -1388,6 +1406,7 @@ class AgeOfLocationEstimate(ExtraBaseModel):
 class TimeWindowModel(ExtraBaseModel):
     startTime: DateTime
     stopTime: DateTime
+
 
 class MonitoringEventSubscription(ExtraBaseModel):
     self: Optional[AnyUrl] = None
