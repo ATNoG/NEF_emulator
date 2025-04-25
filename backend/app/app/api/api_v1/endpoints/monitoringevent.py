@@ -11,6 +11,11 @@ from app.api.api_v1.endpoints.utils import add_notifications
 from app.crud import crud_mongo, ue, user
 from app.db.session import client
 from app.schemas.monitoringevent import MonitoringType
+from ue_movement import (
+    handle_location_report_callback,
+    handle_ue_reachability_callback,
+    handle_loss_connectivity_callback,
+)
 
 from .ue_movement import (
     handle_location_report_callback,
