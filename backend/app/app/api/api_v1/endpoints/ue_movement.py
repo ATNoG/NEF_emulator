@@ -14,7 +14,6 @@ from app.db.session import SessionLocal, client
 from app.models.UE import UE
 from app.schemas import Msg
 from app.schemas.monitoringevent import Point
-from app.schemas.UE import UE
 from app.tools import monitoring_callbacks, qos_callback, timer
 from app.tools.distance import check_distance
 from app.tools.rsrp_calculation import check_path_loss, check_rsrp
