@@ -1,16 +1,17 @@
 from typing import Any, List
-from fastapi import APIRouter, Depends, HTTPException, Path, Response, Request
+
+from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from pymongo.database import Database
-from app import models, schemas
-from app.crud import crud_mongo, user, ue
+
+from app import models, schemas, tools
 from app.api import deps
-from app import tools
-from app.db.session import client
 from app.api.api_v1.endpoints.utils import add_notifications
-from .ue_movement import retrieve_ue_state, retrieve_ue
+from app.crud import crud_mongo, ue, user
+from app.db.session import client
+from app.schemas.monitoringevent import MonitoringType
+
 from .utils import ReportLogging
 
 router = APIRouter()
@@ -92,7 +93,7 @@ def create_subscription(
         example="myNetapp",
     ),
     db: Session = Depends(deps.get_db),
-    item_in: schemas.MonitoringEventSubscriptionCreate,
+    item_in: schemas.MonitoringEventSubscription,
     current_user: models.User = Depends(deps.get_current_active_user),
     http_request: Request,
 ) -> Any:
@@ -130,7 +131,7 @@ def create_subscription(
 
     # One time request
     if (
-        item_in.monitoringType == "LOCATION_REPORTING"
+        item_in.monitoringType == MonitoringType.LOCATION_REPORTING
         and item_in.maximumNumberOfReports == 1
     ):
 
@@ -153,7 +154,7 @@ def create_subscription(
         return http_response
     # Subscription
 
-    elif item_in.monitoringType == "LOCATION_REPORTING" and (
+    elif item_in.monitoringType == MonitoringType.LOCATION_REPORTING and (
         isByMaxReports or isByExpireTime
     ):
 
@@ -184,8 +185,8 @@ def create_subscription(
 
         return http_response
     elif (
-        item_in.monitoringType == "LOSS_OF_CONNECTIVITY"
-        or item_in.monitoringType == "UE_REACHABILITY"
+        item_in.monitoringType == MonitoringType.LOSS_OF_CONNECTIVITY
+        or item_in.monitoringType == MonitoringType.UE_REACHABILITY
     ) and item_in.maximumNumberOfReports == 1:
         return JSONResponse(
             content=jsonable_encoder(
@@ -200,8 +201,8 @@ def create_subscription(
             status_code=403,
         )
     elif (
-        item_in.monitoringType == "LOSS_OF_CONNECTIVITY"
-        or item_in.monitoringType == "UE_REACHABILITY"
+        item_in.monitoringType == MonitoringType.LOSS_OF_CONNECTIVITY
+        or item_in.monitoringType == MonitoringType.UE_REACHABILITY
     ) and (isByMaxReports or isByExpireTime):
         # Check if subscription with externalid && monitoringType exists
         if crud_mongo.read_by_multiple_pairs(

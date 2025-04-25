@@ -1,7 +1,9 @@
-from typing import List, Optional, Union
 from datetime import datetime
-from pydantic import Field, IPvAnyAddress, AnyHttpUrl, confloat, conint, constr
 from enum import Enum
+from typing import Dict, List, Optional, Union
+
+from pydantic import AnyHttpUrl, AnyUrl, Field, IPvAnyAddress, confloat, conint, constr
+
 from .utils import ExtraBaseModel
 
 # Shared properties | used for request body in endpoint/items.py
@@ -310,9 +312,16 @@ class ApplicationlayerId(ExtraBaseModel):
     )
 
 
+class Mcc(ExtraBaseModel):
+    __root__: constr(regex=r"^\d{3}$") = Field(
+        ...,
+        description="Mobile Country Code part of the PLMN, comprising 3 digits, as defined in clause 9.3.3.5 of 3GPP TS 38.413. \n",
+    )
+
+
 class PlmnId(ExtraBaseModel):
-    mcc: int
-    mnc: int
+    mcc: Mcc
+    mnc: Mcc
 
 
 class Tai(ExtraBaseModel):
@@ -327,8 +336,23 @@ class Ecgi(ExtraBaseModel):
     nid: Optional[Nid] = None
 
 
-class SupportedGADShapes(Enum):
+class SupportedGADShapes(str, Enum):
     POINT = "POINT"
+    POINT_UNCERTAINTY_CIRCLE = "POINT_UNCERTAINTY_CIRCLE"
+    POINT_UNCERTAINTY_ELLIPSE = "POINT_UNCERTAINTY_ELLIPSE"
+    POLYGON = "POLYGON"
+    POINT_ALTITUDE = "POINT_ALTITUDE"
+    POINT_ALTITUDE_UNCERTAINTY = "POINT_ALTITUDE_UNCERTAINTY"
+    ELLIPSOID_ARC = "ELLIPSOID_ARC"
+    LOCAL_2D_POINT_UNCERTAINTY_ELLIPSE = "LOCAL_2D_POINT_UNCERTAINTY_ELLIPSE"
+    LOCAL_3D_POINT_UNCERTAINTY_ELLIPSOID = "LOCAL_3D_POINT_UNCERTAINTY_ELLIPSOID"
+    DISTANCE_DIRECTION = "DISTANCE_DIRECTION"
+    RELATIVE_2D_LOCATION_UNCERTAINTY_ELLIPSE = (
+        "RELATIVE_2D_LOCATION_UNCERTAINTY_ELLIPSE"
+    )
+    RELATIVE_3D_LOCATION_UNCERTAINTY_ELLIPSOID = (
+        "RELATIVE_3D_LOCATION_UNCERTAINTY_ELLIPSOID"
+    )
 
 
 class GADShape(ExtraBaseModel):
@@ -805,17 +829,34 @@ class LocationInfo(ExtraBaseModel):
 
 
 class MonitoringType(str, Enum):
-    locationReporting = "LOCATION_REPORTING"
-    lossOfConnectivity = "LOSS_OF_CONNECTIVITY"
-    ueReachability = "UE_REACHABILITY"
+    LOSS_OF_CONNECTIVITY = "LOSS_OF_CONNECTIVITY"
+    UE_REACHABILITY = "UE_REACHABILITY"
+    LOCATION_REPORTING = "LOCATION_REPORTING"
+    CHANGE_OF_IMSI_IMEI_ASSOCIATION = "CHANGE_OF_IMSI_IMEI_ASSOCIATION"
+    ROAMING_STATUS = "ROAMING_STATUS"
+    COMMUNICATION_FAILURE = "COMMUNICATION_FAILURE"
+    AVAILABILITY_AFTER_DDN_FAILURE = "AVAILABILITY_AFTER_DDN_FAILURE"
+    NUMBER_OF_UES_IN_AN_AREA = "NUMBER_OF_UES_IN_AN_AREA"
+    PDN_CONNECTIVITY_STATUS = "PDN_CONNECTIVITY_STATUS"
+    DOWNLINK_DATA_DELIVERY_STATUS = "DOWNLINK_DATA_DELIVERY_STATUS"
+    API_SUPPORT_CAPABILITY = "API_SUPPORT_CAPABILITY"
+    NUM_OF_REGD_UES = "NUM_OF_REGD_UES"
+    NUM_OF_ESTD_PDU_SESSIONS = "NUM_OF_ESTD_PDU_SESSIONS"
+    AREA_OF_INTEREST = "AREA_OF_INTEREST"
+    GROUP_MEMBER_LIST_CHANGE = "GROUP_MEMBER_LIST_CHANGE"
+    APPLICATION_START = "APPLICATION_START"
+    APPLICATION_STOP = "APPLICATION_STOP"
+    SESSION_INACTIVITY_TIME = "SESSION_INACTIVITY_TIME"
+    TRAFFIC_VOLUME = "TRAFFIC_VOLUME"
+    UL_DL_DATA_RATE = "UL_DL_DATA_RATE"
 
 
 class ReachabilityType(str, Enum):
-    sms = "SMS"
-    data = "DATA"
+    SMS = "SMS"
+    DATA = "DATA"
 
 
-class AssociationTypeModel(Enum):
+class AssociationTypeModel(str, Enum):
     IMEI = "IMEI"
     IMEISV = "IMEISV"
 
@@ -925,7 +966,7 @@ class PdnConnectionInformation(ExtraBaseModel):
     macAddrs: Optional[List[MacAddr48]] = Field(None, min_items=1)
 
 
-class DlDataDeliveryStatus(Enum):
+class DlDataDeliveryStatus(str, Enum):
     BUFFERED = "BUFFERED"
     TRANSMITTED = "TRANSMITTED"
     DISCARDED = "DISCARDED"
@@ -1139,3 +1180,342 @@ class MonitoringNotification(ExtraBaseModel):
 
 class MonitoringEventReportReceived(ExtraBaseModel):
     ok: bool
+
+
+class ExternalGroupId(ExtraBaseModel):
+    __root__: str = Field(
+        ...,
+        description='string containing a local identifier followed by "@" and a domain identifier. Both the local identifier and the domain identifier shall be encoded as strings that do not contain any "@" characters. See Clauses 4.6.2 and 4.6.3 of 3GPP TS 23.682 for more information.\n',
+    )
+
+
+class WebsockNotifConfig(ExtraBaseModel):
+    websocketUri: Optional[AnyUrl] = None
+    requestWebsocketUri: Optional[bool] = Field(
+        None,
+        description="Set by the SCS/AS to indicate that the Websocket delivery is requested.",
+    )
+
+
+class LocationType(str, Enum):
+    CURRENT_LOCATION = "CURRENT_LOCATION"
+    LAST_KNOWN_LOCATION = "LAST_KNOWN_LOCATION"
+    CURRENT_OR_LAST_KNOWN_LOCATION = "CURRENT_OR_LAST_KNOWN_LOCATION"
+    INITIAL_LOCATION = "INITIAL_LOCATION"
+
+
+class AccuracyModel(str, Enum):
+    CGI_ECGI = "CGI_ECGI"
+    ENODEB = "ENODEB"
+    TA_RA = "TA_RA"
+    PLMN = "PLMN"
+    TWAN_ID = "TWAN_ID"
+    GEO_AREA = "GEO_AREA"
+    CIVIC_ADDR = "CIVIC_ADDR"
+
+
+class ResponseTime(str, Enum):
+    LOW_DELAY = "LOW_DELAY"
+    DELAY_TOLERANT = "DELAY_TOLERANT"
+    NO_DELAY = "NO_DELAY"
+
+
+class LcsQosClass(str, Enum):
+    BEST_EFFORT = "BEST_EFFORT"
+    ASSURED = "ASSURED"
+    MULTIPLE_QOS = "MULTIPLE_QOS"
+
+
+class LocationQoS(ExtraBaseModel):
+    hAccuracy: Optional[Accuracy] = None
+    vAccuracy: Optional[Accuracy] = None
+    verticalRequested: Optional[bool] = None
+    responseTime: Optional[ResponseTime] = None
+    minorLocQoses: Optional[List[MinorLocationQoS]] = Field(
+        None, max_items=2, min_items=1
+    )
+    lcsQosClass: Optional[LcsQosClass] = None
+
+
+class LinearDistance(ExtraBaseModel):
+    __root__: conint(ge=1, le=10000) = Field(
+        ...,
+        description="Minimum straight line distance moved by a UE to trigger a motion event report.",
+    )
+
+
+class DateTime(ExtraBaseModel):
+    __root__: datetime = Field(
+        ..., description='string with format "date-time" as defined in OpenAPI.'
+    )
+
+
+class ServiceIdentity(ExtraBaseModel):
+    __root__: str = Field(..., description="Contains the service identity")
+
+
+class UpLocRepAddrAfRm1(BaseModel):
+    ipv4Addrs: List[Ipv4Addr] = Field(..., min_items=1)
+    ipv6Addrs: Optional[List[Ipv6Addr]] = Field(None, min_items=1)
+    fqdn: Optional[Fqdn] = None
+
+
+class UpLocRepAddrAfRm2(BaseModel):
+    ipv4Addrs: Optional[List[Ipv4Addr]] = Field(None, min_items=1)
+    ipv6Addrs: List[Ipv6Addr] = Field(..., min_items=1)
+    fqdn: Optional[Fqdn] = None
+
+
+class UpLocRepAddrAfRm3(BaseModel):
+    ipv4Addrs: Optional[List[Ipv4Addr]] = Field(None, min_items=1)
+    ipv6Addrs: Optional[List[Ipv6Addr]] = Field(None, min_items=1)
+    fqdn: Fqdn
+
+
+class UpLocRepAddrAfRm(BaseModel):
+    __root__: Optional[
+        Union[UpLocRepAddrAfRm1, UpLocRepAddrAfRm2, UpLocRepAddrAfRm3]
+    ] = Field(None, description="Represents the user plane addressing information.")
+
+
+class CodeWord(ExtraBaseModel):
+    __root__: str = Field(..., description="Contains the codeword")
+
+
+class NetworkAreaInfo(ExtraBaseModel):
+    ecgis: Optional[List[Ecgi]] = Field(
+        None, description="Contains a list of E-UTRA cell identities.", min_items=1
+    )
+    ncgis: Optional[List[Ncgi]] = Field(
+        None, description="Contains a list of NR cell identities.", min_items=1
+    )
+    gRanNodeIds: Optional[List[GlobalRanNodeId]] = Field(
+        None, description="Contains a list of NG RAN nodes.", min_items=1
+    )
+    tais: Optional[List[Tai]] = Field(
+        None, description="Contains a list of tracking area identities.", min_items=1
+    )
+
+
+class RelatedUeType(str, Enum):
+    LOCATED_UE = "LOCATED_UE"
+    REFERENCE_UE = "REFERENCE_UE"
+
+
+class RelatedUeModel(ExtraBaseModel):
+    applicationlayerId: ApplicationlayerId
+    relatedUeType: RelatedUeType
+
+
+class RangingSlResult(str, Enum):
+    ABSOLUTE_LOCATION = "ABSOLUTE_LOCATION"
+    RELATIVE_LOCATION = "RELATIVE_LOCATION"
+    RANGING_DIRECTION = "RANGING_DIRECTION"
+    RANGING = "RANGING"
+    DIRECTION = "DIRECTION"
+    VELOCITY = "VELOCITY"
+    RELATIVE_VELOCITY = "RELATIVE_VELOCITY"
+
+
+class IpAddr(ExtraBaseModel):
+    ipv4Addr: Optional[Ipv4Addr] = None
+    ipv6Addr: Optional[Ipv6Addr] = None
+    ipv6Prefix: Optional[Ipv6Prefix] = None
+
+
+class SubType(str, Enum):
+    AERIAL_UE = "AERIAL_UE"
+
+
+class UavPolicy(ExtraBaseModel):
+    uavMoveInd: bool
+    revokeInd: bool
+
+
+class SACRepFormat(str, Enum):
+    NUMERICAL = "NUMERICAL"
+    PERCENTAGE = "PERCENTAGE"
+
+
+class LocationArea5G(ExtraBaseModel):
+    geographicAreas: Optional[List[GeographicArea]] = Field(
+        None,
+        description="Identifies a list of geographic area of the user where the UE is located.",
+        min_items=0,
+    )
+    civicAddresses: Optional[List[CivicAddress]] = Field(
+        None,
+        description="Identifies a list of civic addresses of the user where the UE is located.",
+        min_items=0,
+    )
+    nwAreaInfo: Optional[NetworkAreaInfo] = None
+
+
+class LocationArea(ExtraBaseModel):
+    cellIds: Optional[List[str]] = Field(
+        None,
+        description="Indicates a list of Cell Global Identities of the user which identifies the cell the UE is registered.\n",
+        min_items=1,
+    )
+    enodeBIds: Optional[List[str]] = Field(
+        None,
+        description="Indicates a list of eNodeB identities in which the UE is currently located.",
+        min_items=1,
+    )
+    routingAreaIds: Optional[List[str]] = Field(
+        None,
+        description="Identifies a list of Routing Area Identities of the user where the UE is located.\n",
+        min_items=1,
+    )
+    trackingAreaIds: Optional[List[str]] = Field(
+        None,
+        description="Identifies a list of Tracking Area Identities of the user where the UE is located.\n",
+        min_items=1,
+    )
+    geographicAreas: Optional[List[GeographicArea]] = Field(
+        None,
+        description="Identifies a list of geographic area of the user where the UE is located.",
+        min_items=1,
+    )
+    civicAddresses: Optional[List[CivicAddress]] = Field(
+        None,
+        description="Identifies a list of civic addresses of the user where the UE is located.",
+        min_items=1,
+    )
+
+
+class VelocityRequested(str, Enum):
+    VELOCITY_IS_NOT_REQUESTED = "VELOCITY_IS_NOT_REQUESTED"
+    VELOCITY_IS_REQUESTED = "VELOCITY_IS_REQUESTED"
+
+
+class AgeOfLocationEstimate(ExtraBaseModel):
+    __root__: conint(ge=0, le=32767) = Field(
+        ..., description="Indicates value of the age of the location estimate."
+    )
+
+
+class TimeWindowModel(ExtraBaseModel):
+    startTime: DateTime
+    stopTime: DateTime
+
+class MonitoringEventSubscription(ExtraBaseModel):
+    self: Optional[AnyUrl] = None
+    supportedFeatures: Optional[SupportedFeatures] = None
+    mtcProviderId: Optional[str] = Field(
+        None, description="Identifies the MTC Service Provider and/or MTC Application."
+    )
+    appIds: Optional[List[str]] = Field(
+        None, description="Identifies the Application Identifier(s)", min_items=1
+    )
+    externalId: Optional[ExternalId] = None
+    msisdn: Optional[Msisdn] = None
+    addedExternalIds: Optional[List[ExternalId]] = Field(
+        None,
+        description="Indicates the added external Identifier(s) within the active group.",
+        min_items=1,
+    )
+    addedMsisdns: Optional[List[Msisdn]] = Field(
+        None,
+        description="Indicates the added MSISDN(s) within the active group.",
+        min_items=1,
+    )
+    excludedExternalIds: Optional[List[ExternalId]] = Field(
+        None,
+        description="Indicates cancellation of the external Identifier(s) within the active group.",
+        min_items=1,
+    )
+    excludedMsisdns: Optional[List[Msisdn]] = Field(
+        None,
+        description="Indicates cancellation of the MSISDN(s) within the active group.",
+        min_items=1,
+    )
+    externalGroupId: Optional[ExternalGroupId] = None
+    addExtGroupId: Optional[List[ExternalGroupId]] = Field(None, min_items=2)
+    ipv4Addr: Optional[Ipv4AddrModel] = None
+    ipv6Addr: Optional[Ipv6AddrModel] = None
+    dnn: Optional[Dnn] = None
+    notificationDestination: AnyUrl
+    requestTestNotification: Optional[bool] = Field(
+        None,
+        description="Set to true by the SCS/AS to request the SCEF to send a test notification as defined in clause 5.2.5.3. Set to false by the SCS/AS indicates not request SCEF to send a test notification, default false if omitted otherwise.\n",
+    )
+    websockNotifConfig: Optional[WebsockNotifConfig] = None
+    monitoringType: MonitoringType
+    maximumNumberOfReports: Optional[conint(ge=1)] = Field(
+        None,
+        description="Identifies the maximum number of event reports to be generated by the HSS, MME/SGSN as specified in clause 5.6.0 of 3GPP TS 23.682.\n",
+    )
+    monitorExpireTime: Optional[DateTime] = None
+    repPeriod: Optional[DurationSecModel] = None
+    groupReportGuardTime: Optional[DurationSecModel] = None
+    maximumDetectionTime: Optional[DurationSecModel] = None
+    reachabilityType: Optional[ReachabilityType] = None
+    maximumLatency: Optional[DurationSecModel] = None
+    maximumResponseTime: Optional[DurationSecModel] = None
+    suggestedNumberOfDlPackets: Optional[conint(ge=0)] = Field(
+        None,
+        description='If "monitoringType" is "UE_REACHABILITY", this parameter may be included to identify the number of packets that the serving gateway shall buffer in case that the UE is not reachable.\n',
+    )
+    idleStatusIndication: Optional[bool] = Field(
+        None,
+        description='If "monitoringType" is set to "UE_REACHABILITY" or "AVAILABILITY_AFTER_DDN_FAILURE", this parameter may be included to indicate the notification of when a UE, for which PSM is enabled, transitions into idle mode. "true"  indicates enabling of notification; "false"  indicate no need to notify. Default value is "false" if omitted.\n',
+    )
+    locationType: Optional[LocationType] = None
+    accuracy: Optional[AccuracyModel] = None
+    minimumReportInterval: Optional[DurationSecModel] = None
+    maxRptExpireIntvl: Optional[DurationSecModel] = None
+    samplingInterval: Optional[DurationSecModel] = None
+    reportingLocEstInd: Optional[bool] = Field(
+        None,
+        description='Indicates whether to request the location estimate for event reporting. If "monitoringType" is "LOCATION_REPORTING", this parameter may be included to indicate whether event reporting requires the location information. If set to true, the location estimation information shall be included in event reporting. If set to "false", indicates the location estimation information shall not be included in event reporting. Default "false" if omitted.\n',
+    )
+    linearDistance: Optional[LinearDistance] = None
+    locQoS: Optional[LocationQoS] = None
+    svcId: Optional[ServiceIdentity] = None
+    ldrType: Optional[LdrType] = None
+    velocityRequested: Optional[VelocityRequested] = None
+    maxAgeOfLocEst: Optional[AgeOfLocationEstimate] = None
+    locTimeWindow: Optional[TimeWindowModel] = None
+    supportedGADShapes: Optional[List[SupportedGADShapes]] = None
+    codeWord: Optional[CodeWord] = None
+    upLocRepIndAf: Optional[bool] = Field(
+        False,
+        description='Indicates whether location reporting over user plane is requested or not. "true" indicates the location reporting over user plane is requested. "false" indicates the location reporting over user plane is not requested. Default value is "false" if omitted.\n',
+    )
+    upLocRepAddrAf: Optional[UpLocRepAddrAfRm] = None
+    associationType: Optional[AssociationTypeModel] = None
+    plmnIndication: Optional[bool] = Field(
+        None,
+        description='If "monitoringType" is "ROAMING_STATUS", this parameter may be included to indicate the notification of UE\'s Serving PLMN ID. Value "true" indicates enabling of notification; "false" indicates disabling of notification. Default value is "false" if omitted.\n',
+    )
+    locationArea: Optional[LocationArea] = None
+    locationArea5G: Optional[LocationArea5G] = None
+    dddTraDescriptors: Optional[List[DddTrafficDescriptor]] = Field(None, min_items=1)
+    dddStati: Optional[List[DlDataDeliveryStatus]] = Field(None, min_items=1)
+    apiNames: Optional[List[str]] = Field(None, min_items=1)
+    monitoringEventReport: Optional[MonitoringEventReport] = None
+    snssai: Optional[Snssai] = None
+    tgtNsThreshold: Optional[SACInfo] = None
+    nsRepFormat: Optional[SACRepFormat] = None
+    afServiceId: Optional[str] = None
+    immediateRep: Optional[bool] = Field(
+        None,
+        description='Indicates whether an immediate reporting is requested or not. "true" indicate an immediate reporting is requested. "false" indicate an immediate reporting is not requested. Default value "false" if omitted.\n',
+    )
+    uavPolicy: Optional[UavPolicy] = None
+    sesEstInd: Optional[bool] = Field(
+        None,
+        description='Set to true by the SCS/AS so that only UAV\'s with "PDU session established for DNN(s) subject to aerial service" are to be listed in the Event report. Set to false or default false if omitted otherwise.\n',
+    )
+    subType: Optional[SubType] = None
+    addnMonTypes: Optional[List[MonitoringType]] = None
+    addnMonEventReports: Optional[List[MonitoringEventReport]] = None
+    ueIpAddr: Optional[IpAddr] = None
+    ueMacAddr: Optional[MacAddr48] = None
+    revocationNotifUri: Optional[AnyUrl] = None
+    reqRangSlRes: Optional[List[RangingSlResult]] = Field(None, min_items=1)
+    relatedUes: Optional[Dict[str, RelatedUeModel]] = Field(
+        None,
+        description="Contains a list of the related UE(s) for the ranging and sidelink positioning and the corresponding information. The key of the map shall be a any unique string set to the value.\n",
+    )

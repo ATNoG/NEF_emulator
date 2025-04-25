@@ -1,26 +1,23 @@
-import threading, logging, time, requests
-from app.models.UE import UE
-from fastapi import APIRouter, Path, Depends, HTTPException
-from fastapi.encoders import jsonable_encoder
+import logging
+import threading
+import time
 from typing import Any, Literal, Optional
-from fastapi import APIRouter, Path, Depends, HTTPException, BackgroundTasks
+
+import requests
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path
 from fastapi.encoders import jsonable_encoder
-from typing import Any
-from app import crud, tools, models
-from app.crud import crud_mongo
-from app.tools.distance import check_distance
-from app.tools.rsrp_calculation import check_rsrp, check_path_loss
-from app.tools import qos_callback
-from app.db.session import SessionLocal, client
+
+from app import crud, models, tools
 from app.api import deps
+from app.crud import crud_mongo
+from app.db.session import SessionLocal, client
+from app.models.UE import UE
 from app.schemas import Msg
-from app.schemas.afSessionWithQos import AsSessionWithQoSSubscription
-from app.tools import monitoring_callbacks, timer
-
-from app.schemas.UE import UE
-
 from app.schemas.monitoringevent import Point
-from app.tools import monitoring_callbacks, timer
+from app.schemas.UE import UE
+from app.tools import monitoring_callbacks, qos_callback, timer
+from app.tools.distance import check_distance
+from app.tools.rsrp_calculation import check_path_loss, check_rsrp
 
 # Dictionary holding threads that are running per user id.
 threads = {}
