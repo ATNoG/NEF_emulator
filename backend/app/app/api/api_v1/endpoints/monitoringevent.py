@@ -11,12 +11,12 @@ from app.api.api_v1.endpoints.utils import add_notifications
 from app.crud import crud_mongo, ue, user
 from app.db.session import client
 from app.schemas.monitoringevent import MonitoringType
-from ue_movement import (
-    handle_location_report_callback,
-    handle_ue_reachability_callback,
-    handle_loss_connectivity_callback,
-)
 
+from .ue_movement import (
+    handle_location_report_callback,
+    handle_loss_connectivity_callback,
+    handle_ue_reachability_callback,
+)
 from .utils import ReportLogging
 
 router = APIRouter()
@@ -110,13 +110,13 @@ def create_subscription(
     UE = None
     if item_in.externalId:
         UE = ue.get_externalId(
-            db=db, externalId=str(item_in.externalId), owner_id=current_user.id
+            db=db, externalId=item_in.externalId.__root__, owner_id=current_user.id
         )
 
     # Because item_in puts default values to externalId and msisdn, even if none are specified.
     # Therefore we need to check if we already have the UE
     if not UE and item_in.msisdn:
-        UE = ue.get_supi(db=db, supi=item_in.msisdn)
+        UE = ue.get_supi(db=db, supi=item_in.msisdn.__root__)
 
     if not UE:
         raise HTTPException(
@@ -139,7 +139,9 @@ def create_subscription(
 
             json_compatible_item_data = {}
             json_compatible_item_data["monitoringType"] = item_in.monitoringType
-            json_compatible_item_data["externalId"] = item_in.externalId
+            json_compatible_item_data["externalId"] = (
+                item_in.externalId and item_in.externalId.__root__
+            )
             json_compatible_item_data["ipv4Addr"] = UE.ip_address_v4
 
             if UE.Cell:
@@ -188,9 +190,6 @@ def create_subscription(
 
             inserted_doc = crud_mongo.create(db_mongo, db_collection, json_data)
 
-            if item_in.immediateRep:
-                handle_location_report_callback(inserted_doc, UE)
-
             # Create the reference resource and location header
             link = str(http_request.url) + "/" + str(inserted_doc.inserted_id)
             response_header = {"location": link}
@@ -206,6 +205,9 @@ def create_subscription(
             )
             updated_doc.pop("owner_id")
 
+            if item_in.immediateRep:
+                handle_location_report_callback(updated_doc, UE)
+
             http_response = JSONResponse(
                 content=updated_doc, status_code=201, headers=response_header
             )
@@ -220,7 +222,7 @@ def create_subscription(
             if crud_mongo.read_by_multiple_pairs(
                 db_mongo,
                 db_collection,
-                externalId=item_in.externalId,
+                externalId=item_in.externalId and item_in.externalId.__root__,
                 monitoringType=item_in.monitoringType,
             ):
                 raise HTTPException(
