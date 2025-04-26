@@ -1,9 +1,6 @@
-import logging
-import threading
-import time
+import logging, asyncio, time, requests
 from typing import Any, Literal, Optional
 
-import requests
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path
 from fastapi.encoders import jsonable_encoder
 
@@ -168,8 +165,8 @@ async def location_notification(
             await handle_location_report_callback(sub, ue)
 
         elif monitoringType == "LOSS_OF_CONNECTIVITY":
-            await handle_loss_connectivity_callback(
-                sub, ue, old_cell_id, current_cell_id
+            asyncio.create_task(
+                handle_loss_connectivity_callback(sub, ue, old_cell_id, current_cell_id)
             )
 
         elif monitoringType == "UE_REACHABILITY":
@@ -178,53 +175,49 @@ async def location_notification(
 
 async def handle_location_report_callback(location_reporting_sub, ue: UE):
     db_mongo = client.fastapi
-    try:
-        logging.info(
-            "Attempting to send the callback to %d",
-            location_reporting_sub.get("notificationDestination"),
-        )
-        print(
-            f"Attempting to send the callback to {location_reporting_sub.get('notificationDestination')}"
-        )
+    logging.info(
+        "Attempting to send the callback to %d",
+        location_reporting_sub.get("notificationDestination"),
+    )
+    print(
+        f"Attempting to send the callback to {location_reporting_sub.get('notificationDestination')}"
+    )
 
-        notification = MonitoringNotification(
-            subscription=location_reporting_sub.get("link"),
-            monitoringEventReports=[
-                MonitoringEventReport(
-                    externalId=ue.external_identifier,
-                    monitoringType=MonitoringType.LOCATION_REPORTING,
-                    locationInfo=LocationInfo(
-                        cellId=ue.Cell_id,
-                        enodeBId=None,
-                        geographicArea=Point(
-                            shape=SupportedGADShapes.POINT,
-                            point=GeographicalCoordinates(
-                                lat=ue.latitude,
-                                lon=ue.longitude,
-                            ),
+    notification = MonitoringNotification(
+        subscription=location_reporting_sub.get("link"),
+        monitoringEventReports=[
+            MonitoringEventReport(
+                externalId=ue.external_identifier,
+                monitoringType=MonitoringType.LOCATION_REPORTING,
+                locationInfo=LocationInfo(
+                    cellId=ue.Cell_id,
+                    enodeBId=None,
+                    geographicArea=Point(
+                        shape=SupportedGADShapes.POINT,
+                        point=GeographicalCoordinates(
+                            lat=ue.latitude,
+                            lon=ue.longitude,
                         ),
                     ),
-                )
-            ],
-        )
-
-        await notification_responder.send_notification(
-            location_reporting_sub.get("notificationDestination"), notification
-        )
-
-        maxReports = location_reporting_sub.get("maximumNumberOfReports")
-
-        if maxReports:
-            location_reporting_sub.update({"maximumNumberOfReports": maxReports - 1})
-            crud_mongo.update(
-                db_mongo,
-                "MonitoringEvent",
-                location_reporting_sub.get("_id"),
-                location_reporting_sub,
+                ),
             )
+        ],
+    )
 
-    except requests.exceptions.ConnectionError as ex:
-        logging.warning("Failed to send the callback request with error %d", ex)
+    await notification_responder.send_notification(
+        location_reporting_sub.get("notificationDestination"), notification
+    )
+
+    maxReports = location_reporting_sub.get("maximumNumberOfReports")
+
+    if maxReports:
+        location_reporting_sub.update({"maximumNumberOfReports": maxReports - 1})
+        crud_mongo.update(
+            db_mongo,
+            "MonitoringEvent",
+            location_reporting_sub.get("_id"),
+            location_reporting_sub,
+        )
 
 
 async def handle_loss_connectivity_callback(
@@ -234,9 +227,25 @@ async def handle_loss_connectivity_callback(
     current_cell_id: Optional[int],
 ):
     if old_cell_id and not current_cell_id:
-        pass
-        # TODO: Whenever the UE loses access to the cell, spawn a async task that sleeps for maximumDurationTime and then checks
-        # if the UE is still unreachable. If that happens, then send the notification
+        await asyncio.sleep(loss_of_connectivity_sub.get("maximumDurationTime"))
+        db = SessionLocal()
+        new_ue = crud.ue.get_supi(db=db, supi=ue.supi)
+        if new_ue and not new_ue.Cell_id:
+            notification = MonitoringNotification(
+                subscription=loss_of_connectivity_sub.get("link"),
+                monitoringEventReports=[
+                    MonitoringEventReport(
+                        externalId=ue.external_identifier,
+                        monitoringType=MonitoringType.LOSS_OF_CONNECTIVITY,
+                        lossOfConnectReason=2,
+                    )
+                ],
+            )
+
+            await notification_responder.send_notification(
+                loss_of_connectivity_sub.get("notificationDestination"), notification
+            )
+
     logging.info("There was an attempt at calling the connectivity callback")
 
 
