@@ -13,7 +13,21 @@ from app.crud import crud_mongo
 from app.db.session import SessionLocal, client
 from app.models.UE import UE
 from app.schemas import Msg
-from app.schemas.monitoringevent import Point
+from app.schemas.monitoringevent import (
+    MonitoringEventReport,
+    MonitoringNotification,
+    MonitoringType,
+    LocationInfo,
+    Point,
+    ReachabilityType,
+    SupportedGADShapes,
+    GeographicalCoordinates,
+)
+from app.schemas.afSessionWithQos import AsSessionWithQoSSubscription
+from app.tools import monitoring_callbacks, timer
+
+from app.core.notification_responder import notification_responder
+
 from app.tools import monitoring_callbacks, qos_callback, timer
 from app.tools.distance import check_distance
 from app.tools.rsrp_calculation import check_path_loss, check_rsrp
@@ -72,7 +86,7 @@ def validate_ue(*, ue: Optional[UE], user: models.User, db) -> Optional[UE]:
     return ue
 
 
-def movement_loop(supi: str, user: models.User):
+async def movement_loop(supi: str, user: models.User):
     db = SessionLocal()
     ue = validate_ue(ue=crud.ue.get_supi(db=db, supi=supi), user=user, db=db)
 
@@ -118,12 +132,16 @@ def movement_loop(supi: str, user: models.User):
                 obj_in={"Cell_id": ue.Cell_id},
             )
 
-        location_notification(ue)
+        await location_notification(
+            ue, ue.Cell_id, cell_now.get("id") if cell_now else None
+        )
 
         time.sleep(1)
 
 
-def location_notification(ue: UE):
+async def location_notification(
+    ue: UE, old_cell_id: Optional[int], current_cell_id: Optional[int]
+):
     db_mongo = client.fastapi
     subscriptions = crud_mongo.read_all_by_multiple_pairs(
         db_mongo,
@@ -147,16 +165,18 @@ def location_notification(ue: UE):
         monitoringType = sub["monitoringType"]
 
         if monitoringType == "LOCATION_REPORTING":
-            handle_location_report_callback(sub, ue)
+            await handle_location_report_callback(sub, ue)
 
         elif monitoringType == "LOSS_OF_CONNECTIVITY":
-            handle_loss_connectivity_callback(sub, ue)
+            await handle_loss_connectivity_callback(
+                sub, ue, old_cell_id, current_cell_id
+            )
 
         elif monitoringType == "UE_REACHABILITY":
-            handle_ue_reachability_callback(sub, ue)
+            await handle_ue_reachability_callback(sub, ue, old_cell_id, current_cell_id)
 
 
-def handle_location_report_callback(location_reporting_sub, ue: UE):
+async def handle_location_report_callback(location_reporting_sub, ue: UE):
     db_mongo = client.fastapi
     try:
         logging.info(
@@ -166,10 +186,30 @@ def handle_location_report_callback(location_reporting_sub, ue: UE):
         print(
             f"Attempting to send the callback to {location_reporting_sub.get('notificationDestination')}"
         )
-        monitoring_callbacks.location_callback(
-            jsonable_encoder(ue),
-            location_reporting_sub.get("notificationDestination"),
-            location_reporting_sub.get("link"),
+
+        notification = MonitoringNotification(
+            subscription=location_reporting_sub.get("link"),
+            monitoringEventReports=[
+                MonitoringEventReport(
+                    externalId=ue.external_identifier,
+                    monitoringType=MonitoringType.LOCATION_REPORTING,
+                    locationInfo=LocationInfo(
+                        cellId=ue.Cell_id,
+                        enodeBId=None,
+                        geographicArea=Point(
+                            shape=SupportedGADShapes.POINT,
+                            point=GeographicalCoordinates(
+                                lat=ue.latitude,
+                                lon=ue.longitude,
+                            ),
+                        ),
+                    ),
+                )
+            ],
+        )
+
+        await notification_responder.send_notification(
+            location_reporting_sub.get("notificationDestination"), notification
         )
 
         maxReports = location_reporting_sub.get("maximumNumberOfReports")
@@ -187,12 +227,37 @@ def handle_location_report_callback(location_reporting_sub, ue: UE):
         logging.warning("Failed to send the callback request with error %d", ex)
 
 
-def handle_loss_connectivity_callback(loss_of_connectivity_sub, ue: UE):
-    logging.error("There was an attempt at calling the connectivity callback")
+async def handle_loss_connectivity_callback(
+    loss_of_connectivity_sub,
+    ue: UE,
+    old_cell_id: Optional[int],
+    current_cell_id: Optional[int],
+):
+    if old_cell_id and not current_cell_id:
+        pass
+        # TODO: Whenever the UE loses access to the cell, spawn a async task that sleeps for maximumDurationTime and then checks
+        # if the UE is still unreachable. If that happens, then send the notification
+    logging.info("There was an attempt at calling the connectivity callback")
 
 
-def handle_ue_reachability_callback(subscription, ue: UE):
-    logging.error("There was an attempt at calling the reachability callback")
+async def handle_ue_reachability_callback(
+    subscription, ue: UE, old_cell_id: Optional[int], current_cell_id: Optional[int]
+):
+    if current_cell_id and not old_cell_id:
+        notification = MonitoringNotification(
+            subscription=subscription.get("link"),
+            monitoringEventReports=[
+                MonitoringEventReport(
+                    externalId=ue.external_identifier,
+                    monitoringType=MonitoringType.UE_REACHABILITY,
+                    reachabilityType=ReachabilityType.DATA,
+                )
+            ],
+        )
+
+        await notification_responder.send_notification(
+            subscription.get("notificationDestination"), notification
+        )
 
 
 @router.post("/update_location/{supi}", status_code=200)
@@ -219,7 +284,6 @@ def update_location(
         db_obj=ue,
     )
 
-    # TODO: Send notifications related to location update
     background_tasks.add_task(location_notification, ue)
 
     return {"msg": "Location updated"}
