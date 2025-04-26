@@ -1,6 +1,7 @@
 import logging
 import threading
 import time
+import asyncio
 from typing import Any, Literal, Optional
 
 import requests
@@ -25,6 +26,8 @@ from app.schemas.monitoringevent import (
 )
 from app.schemas.afSessionWithQos import AsSessionWithQoSSubscription
 from app.tools import monitoring_callbacks, timer
+
+from app.core.notification_responder import notification_responder
 
 # Dictionary holding threads that are running per user id.
 threads = {}
@@ -151,6 +154,8 @@ async def location_notification(
         sub_validate_number_of_reports = tools.check_numberOfReports(
             sub.get("maximumNumberOfReports")
         )
+
+        monitoringType = sub["monitoringType"]
 
         if not sub_validate_time or not sub_validate_number_of_reports:
             crud_mongo.delete_by_uuid(db_mongo, "MonitoringEvent", sub.get("_id"))
@@ -291,192 +296,6 @@ def update_location(
     background_tasks.add_task(location_notification, ue)
 
     return {"msg": "Location updated"}
-
-
-moving_devices = dict()
-
-Speed = Literal["HIGH", "LOW"]
-
-
-def increment_position(speed: Speed) -> int:
-    if speed == "LOW":
-        return 1
-
-    if speed == "HIGH":
-        return 10
-
-
-def validate_ue(*, ue: Optional[UE], user: models.User, db) -> Optional[UE]:
-    if not ue:
-        logging.warning("UE not found")
-        return None
-
-    if ue.owner_id != user.id:
-        logging.warning("Not enough permissions")
-        return None
-
-    path = crud.path.get(db=db, id=ue.path_id)
-    if not path:
-        logging.warning("Path not found")
-        return None
-
-    if path.owner_id != user.id:
-        logging.warning("Not enough permissions")
-        return None
-
-    return ue
-
-
-def movement_loop(supi: str, user: models.User):
-    db = SessionLocal()
-    ue = validate_ue(ue=crud.ue.get_supi(db=db, supi=supi), user=user, db=db)
-
-    if ue is None:
-        moving_devices.pop(supi)
-        return
-
-    points = crud.points.get_points(db=db, path_id=ue.path_id)
-
-    # Assume end of path
-    current_position_index = -1
-    cells = jsonable_encoder(crud.cell.get_multi_by_owner(db=db, owner_id=user.id))
-
-    # Find current position if one exists
-    for index, point in enumerate(points):
-        if (ue.latitude == point.latitude) and (ue.longitude == point.longitude):
-            current_position_index = index
-            break
-
-    while True:
-        if supi not in moving_devices:
-            break
-
-        current_position_index += increment_position(ue.speed) % len(points)
-        point = points[current_position_index]
-
-        cell_now, cell_distances = check_distance(
-            point.latitude, point.longitude, cells
-        )
-
-        ue = crud.ue.update_coordinates(
-            db=db, lat=point.latitude, long=point.longitude, db_obj=ue
-        )
-
-        logging.info("The current cell is %d", cell_now)
-        if cell_now and ue.Cell_id != cell_now.get("id"):
-            ue.Cell_id = cell_now.get("id")
-            crud.ue.update(
-                db=db,
-                db_obj=ue,
-                obj_in={"Cell_id": ue.Cell_id},
-            )
-
-        location_notification(ue)
-
-        time.sleep(1)
-
-
-def location_notification(ue: UE):
-    db_mongo = client.fastapi
-    subscriptions = crud_mongo.read_all_by_multiple_pairs(
-        db_mongo,
-        "MonitoringEvent",
-        externalId=ue.external_identifier,
-    )
-
-    for sub in subscriptions:
-        sub_validate_time = tools.check_expiration_time(
-            expire_time=sub.get("monitorExpireTime")
-        )
-
-        sub_validate_number_of_reports = tools.check_numberOfReports(
-            sub.get("maximumNumberOfReports")
-        )
-
-        if not sub_validate_time or not sub_validate_number_of_reports:
-            crud_mongo.delete_by_uuid(db_mongo, "MonitoringEvent", sub.get("_id"))
-            continue
-
-        monitoringType = sub["monitoringType"]
-
-        if monitoringType == "LOCATION_REPORTING":
-            handle_location_report_callback(sub, ue)
-
-        elif monitoringType == "LOSS_OF_CONNECTIVITY":
-            handle_loss_connectivity_callback(sub, ue)
-
-        elif monitoringType == "UE_REACHABILITY":
-            handle_ue_reachability_callback(sub, ue)
-
-
-def handle_location_report_callback(location_reporting_sub, ue: UE):
-    db_mongo = client.fastapi
-    try:
-        logging.info(
-            "Attempting to send the callback to %d",
-            location_reporting_sub.get("notificationDestination"),
-        )
-        print(
-            f"Attempting to send the callback to {location_reporting_sub.get('notificationDestination')}"
-        )
-        monitoring_callbacks.location_callback(
-            jsonable_encoder(ue),
-            location_reporting_sub.get("notificationDestination"),
-            location_reporting_sub.get("link"),
-        )
-
-        maxReports = location_reporting_sub.get("maximumNumberOfReports")
-
-        if maxReports:
-            location_reporting_sub.update({"maximumNumberOfReports": maxReports - 1})
-            crud_mongo.update(
-                db_mongo,
-                "MonitoringEvent",
-                location_reporting_sub.get("_id"),
-                location_reporting_sub,
-            )
-
-    except requests.exceptions.ConnectionError as ex:
-        logging.warning("Failed to send the callback request with error %d", ex)
-
-
-def handle_loss_connectivity_callback(loss_of_connectivity_sub, ue: UE):
-    logging.error("There was an attempt at calling the connectivity callback")
-
-
-def handle_ue_reachability_callback(subscription, ue: UE):
-    logging.error("There was an attempt at calling the reachability callback")
-
-
-@router.post("/update_location/{supi}", status_code=200)
-def update_location(
-    *,
-    supi: str = Path(...),
-    new_location: Point,
-    background_tasks: BackgroundTasks,
-    current_user: models.User = Depends(deps.get_current_active_user),
-):
-    db = SessionLocal()
-    ue = crud.ue.get_supi(db, supi)
-
-    if not ue:
-        raise HTTPException(
-            status_code=404,
-            detail="No device found",
-        )
-
-    ue = crud.ue.update_coordinates(
-        db,
-        lat=new_location.point.lat,
-        long=new_location.point.lon,
-        db_obj=ue,
-    )
-
-    # TODO: Send notifications related to location update
-    background_tasks.add_task(location_notification, ue)
-
-    return {"msg": "Location updated"}
-
 
 @router.post("/start-loop", status_code=200)
 def initiate_movement(
