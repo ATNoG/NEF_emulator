@@ -1,10 +1,6 @@
-import logging
-import threading
-import time
-import asyncio
+import logging, asyncio
 from typing import Any, Literal, Optional
 
-import requests
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path
 from fastapi.encoders import jsonable_encoder
 
@@ -28,6 +24,10 @@ from app.schemas.afSessionWithQos import AsSessionWithQoSSubscription
 from app.tools import monitoring_callbacks, timer
 
 from app.core.notification_responder import notification_responder
+
+from app.tools import monitoring_callbacks, qos_callback, timer
+from app.tools.distance import check_distance
+from app.tools.rsrp_calculation import check_path_loss, check_rsrp
 
 # Dictionary holding threads that are running per user id.
 threads = {}
@@ -146,6 +146,14 @@ async def location_notification(
         externalId=ue.external_identifier,
     )
 
+    subscriptions.extend(
+        crud_mongo.read_all_by_multiple_pairs(
+            db_mongo,
+            "MonitoringEvent",
+            msisdn=ue.msisdn,
+        )
+    )
+
     for sub in subscriptions:
         sub_validate_time = tools.check_expiration_time(
             expire_time=sub.get("monitorExpireTime")
@@ -155,11 +163,11 @@ async def location_notification(
             sub.get("maximumNumberOfReports")
         )
 
-        monitoringType = sub["monitoringType"]
-
         if not sub_validate_time or not sub_validate_number_of_reports:
             crud_mongo.delete_by_uuid(db_mongo, "MonitoringEvent", sub.get("_id"))
             continue
+
+        monitoringType = sub["monitoringType"]
 
         if monitoringType == "LOCATION_REPORTING":
             await handle_location_report_callback(sub, ue)
@@ -297,6 +305,7 @@ def update_location(
 
     return {"msg": "Location updated"}
 
+
 @router.post("/start-loop", status_code=200)
 def initiate_movement(
     *,
@@ -420,4 +429,4 @@ def monitoring_event_sub_validation(
         )
         if sub_validate_time and sub_validate_number_of_reports:
             return True
-        else:
+        return False
