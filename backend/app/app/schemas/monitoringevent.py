@@ -1268,24 +1268,6 @@ class UpLocRepAddrAfRm(ExtraBaseModel):
     fqdn: Optional[Fqdn] = None
 
 
-class UpLocRepAddrAfRm2(BaseModel):
-    ipv4Addrs: Optional[List[Ipv4Addr]] = Field(None, min_items=1)
-    ipv6Addrs: List[Ipv6Addr] = Field(..., min_items=1)
-    fqdn: Optional[Fqdn] = None
-
-
-class UpLocRepAddrAfRm3(BaseModel):
-    ipv4Addrs: Optional[List[Ipv4Addr]] = Field(None, min_items=1)
-    ipv6Addrs: Optional[List[Ipv6Addr]] = Field(None, min_items=1)
-    fqdn: Fqdn
-
-
-class UpLocRepAddrAfRm(BaseModel):
-    __root__: Optional[
-        Union[UpLocRepAddrAfRm1, UpLocRepAddrAfRm2, UpLocRepAddrAfRm3]
-    ] = Field(None, description="Represents the user plane addressing information.")
-
-
 class CodeWord(ExtraBaseModel):
     __root__: str = Field(..., description="Contains the codeword")
 

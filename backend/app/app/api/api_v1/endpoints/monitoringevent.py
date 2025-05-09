@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
+from bson.objectid import ObjectId
+from pydantic import parse_obj_as
 
 from app import models, schemas, tools
 from app.api import deps
@@ -11,11 +13,8 @@ from app.api.api_v1.endpoints.utils import add_notifications
 from app.crud import crud_mongo, ue, user
 from app.db.session import client
 from app.schemas.monitoringevent import MonitoringType
-from ue_movement import (
-    handle_location_report_callback,
-    handle_ue_reachability_callback,
-    handle_loss_connectivity_callback,
-)
+from app.schemas.commonData import Link
+from app.crud import crud_mongo, ue as crud_ue, user
 
 from .ue_movement import (
     handle_location_report_callback,
@@ -49,12 +48,18 @@ def read_active_subscriptions(
     """
     db_mongo = client.fastapi
 
-    retrieved_docs = crud_mongo.read_all(db_mongo, db_collection, current_user.id)
-    temp_json_subs = (
-        retrieved_docs.copy()
-    )  # Create copy of the list (json_subs) -> you cannot remove items from a list while you iterating the list.
+    retrieved_docs = list(
+        map(
+            lambda doc: doc["subscription"],
+            db_mongo[db_collection].find(
+                {"owner_id": current_user.id},
+                projection={"_id": False, "subscription": True},
+            ),
+        )
+    )
 
-    for sub in temp_json_subs:
+    for i in range(len(retrieved_docs) - 1, -1, -1):
+        sub = retrieved_docs[i]
         sub_validate_time = tools.check_expiration_time(
             expire_time=sub.get("monitorExpireTime")
         )
@@ -62,11 +67,10 @@ def read_active_subscriptions(
             crud_mongo.delete_by_item(
                 db_mongo, db_collection, "externalId", sub.get("externalId")
             )
-            retrieved_docs.remove(sub)
-
-    temp_json_subs.clear()
+            retrieved_docs.pop(i)
 
     if retrieved_docs:
+
         http_response = JSONResponse(content=retrieved_docs, status_code=200)
         add_notifications(http_request, http_response, False)
         return http_response
@@ -110,22 +114,41 @@ def create_subscription(
     """
     Create new subscription.
     """
-    db_mongo = client.fastapi
-
-    UE = None
-    if item_in.externalId:
-        UE = ue.get_externalId(
-            db=db, externalId=item_in.externalId.__root__, owner_id=current_user.id
+    if item_in.self is not None:
+        raise HTTPException(
+            status_code=400, detail="The self attribute must not be set"
         )
 
-    # Because item_in puts default values to externalId and msisdn, even if none are specified.
-    # Therefore we need to check if we already have the UE
-    if not UE and item_in.msisdn:
-        UE = ue.get_supi(db=db, supi=item_in.msisdn.__root__)
+    db_mongo = client.fastapi
 
-    if not UE:
+    ue = None
+
+    id = ObjectId()
+    item_in.self = parse_obj_as(Link, f"{http_request.url}/{id}")
+
+    if item_in.ipv4Addr is not None:
+        id_value = str(item_in.ueIpv4Addr)
+        ue = crud_ue.get_ipv4(db=db, ipv4=id_value, owner_id=current_user.id)
+
+    elif item_in.ipv6Addr is not None:
+        id_value = item_in.ueIpv6Addr.exploded
+        ue = crud_ue.get_ipv6(db=db, ipv6=id_value, owner_id=current_user.id)
+
+    elif item_in.externalId:
+        print("The externalId is ", item_in.externalId)
+        ue = crud_ue.get_externalId(
+            db=db, externalId=item_in.externalId, owner_id=current_user.id
+        )
+
+    elif item_in.msisdn:
+        print("The msisdn is ", item_in.msisdn.__root__)
+        ue = crud_ue.get_msisdn(
+            db=db, msisdn=item_in.msisdn.__root__, owner_id=current_user.id
+        )
+
+    if not ue:
         raise HTTPException(
-            status_code=404, detail="UE with this external identifier doesn't exist"
+            status_code=404, detail="UE with this identifier doesn't exist"
         )
 
     isByMaxReports = item_in.maximumNumberOfReports
@@ -147,12 +170,12 @@ def create_subscription(
             json_compatible_item_data["externalId"] = (
                 item_in.externalId and item_in.externalId.__root__
             )
-            json_compatible_item_data["ipv4Addr"] = UE.ip_address_v4
+            json_compatible_item_data["ipv4Addr"] = ue.ip_address_v4
 
-            if UE.Cell:
+            if ue.Cell:
                 json_compatible_item_data["locationInfo"] = {
-                    "cellId": UE.Cell.cell_id,
-                    "gNBId": UE.Cell.gNB.gNB_id,
+                    "cellId": ue.Cell.cell_id,
+                    "gNBId": ue.Cell.gNB.gNB_id,
                 }
             else:
                 json_compatible_item_data["locationInfo"] = {
@@ -167,9 +190,9 @@ def create_subscription(
 
             return http_response
 
-        if (
-            item_in.monitoringType == MonitoringType.LOSS_OF_CONNECTIVITY
-            or item_in.monitoringType == MonitoringType.UE_REACHABILITY
+        if item_in.monitoringType in (
+            MonitoringType.LOSS_OF_CONNECTIVITY,
+            MonitoringType.UE_REACHABILITY,
         ):
             return JSONResponse(
                 content=jsonable_encoder(
@@ -190,28 +213,35 @@ def create_subscription(
 
             json_data = jsonable_encoder(item_in.dict(exclude_unset=True))
             json_data.update(
-                {"owner_id": current_user.id, "ipv4Addr": UE.ip_address_v4}
+                {
+                    "owner_id": current_user.id,
+                    "ipv4Addr": ue.ip_address_v4,
+                }
             )
 
-            inserted_doc = crud_mongo.create(db_mongo, db_collection, json_data)
+            inserted_doc = crud_mongo.create(
+                db_mongo,
+                db_collection,
+                {
+                    "supi": ue.supi,
+                    "subscription": json_data,
+                    "owner_id": current_user.id,
+                },
+            )
 
             # Create the reference resource and location header
             link = str(http_request.url) + "/" + str(inserted_doc.inserted_id)
             response_header = {"location": link}
 
-            # Update the subscription with the new resource (link) and return the response (+response header)
-            crud_mongo.update_new_field(
-                db_mongo, db_collection, inserted_doc.inserted_id, {"link": link}
-            )
-
             # Retrieve the updated document | UpdateResult is not a dict
             updated_doc = crud_mongo.read_uuid(
                 db_mongo, db_collection, inserted_doc.inserted_id
-            )
+            )["subscription"]
             updated_doc.pop("owner_id")
+            updated_doc["self"] = f"{http_request.url}/{inserted_doc.inserted_id}"
 
             if item_in.immediateRep:
-                handle_location_report_callback(updated_doc, UE)
+                handle_location_report_callback(updated_doc, ue)
 
             http_response = JSONResponse(
                 content=updated_doc, status_code=201, headers=response_header
@@ -219,9 +249,9 @@ def create_subscription(
             add_notifications(http_request, http_response, False)
 
             return http_response
-        if (
-            item_in.monitoringType == MonitoringType.LOSS_OF_CONNECTIVITY
-            or item_in.monitoringType == MonitoringType.UE_REACHABILITY
+        if item_in.monitoringType in (
+            MonitoringType.LOSS_OF_CONNECTIVITY,
+            MonitoringType.UE_REACHABILITY,
         ):
             # Check if subscription with externalid && monitoringType exists
             if crud_mongo.read_by_multiple_pairs(
@@ -237,37 +267,48 @@ def create_subscription(
 
             json_data = jsonable_encoder(item_in.dict(exclude_unset=True))
             json_data.update(
-                {"owner_id": current_user.id, "ipv4Addr": UE.ip_address_v4}
+                {
+                    "owner_id": current_user.id,
+                    "ipv4Addr": ue.ip_address_v4,
+                }
             )
 
-            inserted_doc = crud_mongo.create(db_mongo, db_collection, json_data)
+            inserted_doc = crud_mongo.create(
+                db_mongo,
+                db_collection,
+                {
+                    "supi": UE.supi,
+                    "subscription": json_data,
+                    "owner_id": current_user.id,
+                },
+            )
 
             if (
                 item_in.immediateRep
                 and item_in.monitoringType == MonitoringType.LOSS_OF_CONNECTIVITY
             ):
-                handle_loss_connectivity_callback(inserted_doc, UE)
+                handle_loss_connectivity_callback(
+                    inserted_doc, ue, ue.Cell_id, ue.Cell_id
+                )
 
             elif (
                 item_in.immediateRep
                 and item_in.monitoringType == MonitoringType.UE_REACHABILITY
             ):
-                handle_ue_reachability_callback(inserted_doc, UE)
+                handle_ue_reachability_callback(
+                    inserted_doc, ue, ue.Cell_id, ue.Cell_id
+                )
 
             # Create the reference resource and location header
             link = str(http_request.url) + "/" + str(inserted_doc.inserted_id)
             response_header = {"location": link}
 
-            # Update the subscription with the new resource (link) and return the response (+response header)
-            crud_mongo.update_new_field(
-                db_mongo, db_collection, inserted_doc.inserted_id, {"link": link}
-            )
-
             # Retrieve the updated document | UpdateResult is not a dict
             updated_doc = crud_mongo.read_uuid(
                 db_mongo, db_collection, inserted_doc.inserted_id
-            )
+            )["subscription"]
             updated_doc.pop("owner_id")
+            updated_doc["self"] = f"{http_request.url}/{inserted_doc.inserted_id}"
 
             http_response = JSONResponse(
                 content=updated_doc, status_code=201, headers=response_header
@@ -325,7 +366,9 @@ def update_subscription(
         crud_mongo.update_new_field(db_mongo, db_collection, subscriptionId, json_data)
 
         # Retrieve the updated document | UpdateResult is not a dict
-        updated_doc = crud_mongo.read_uuid(db_mongo, db_collection, subscriptionId)
+        updated_doc = crud_mongo.read_uuid(db_mongo, db_collection, subscriptionId)[
+            "subscription"
+        ]
         updated_doc.pop("owner_id")
 
         http_response = JSONResponse(content=updated_doc, status_code=200)

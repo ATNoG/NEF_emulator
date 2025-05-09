@@ -20,14 +20,10 @@ from app.schemas.monitoringevent import (
     SupportedGADShapes,
     GeographicalCoordinates,
 )
-from app.schemas.afSessionWithQos import AsSessionWithQoSSubscription
-from app.tools import monitoring_callbacks, timer
 
 from app.core.notification_responder import notification_responder
 
-from app.tools import monitoring_callbacks, qos_callback, timer
 from app.tools.distance import check_distance
-from app.tools.rsrp_calculation import check_path_loss, check_rsrp
 
 # Dictionary holding threads that are running per user id.
 threads = {}
@@ -140,21 +136,15 @@ async def location_notification(
     ue: UE, old_cell_id: Optional[int], current_cell_id: Optional[int]
 ):
     db_mongo = client.fastapi
-    subscriptions = crud_mongo.read_all_by_multiple_pairs(
-        db_mongo,
-        "MonitoringEvent",
-        externalId=ue.external_identifier,
+
+    subscriptions = list(
+        db_mongo["MonitoringEvent"].find(
+            {"supi": str(ue.supi)},
+        ),
     )
 
-    subscriptions.extend(
-        crud_mongo.read_all_by_multiple_pairs(
-            db_mongo,
-            "MonitoringEvent",
-            msisdn=ue.msisdn,
-        )
-    )
-
-    for sub in subscriptions:
+    for doc in subscriptions:
+        sub = doc["subscription"]
         sub_validate_time = tools.check_expiration_time(
             expire_time=sub.get("monitorExpireTime")
         )
@@ -164,8 +154,13 @@ async def location_notification(
         )
 
         if not sub_validate_time or not sub_validate_number_of_reports:
-            crud_mongo.delete_by_uuid(db_mongo, "MonitoringEvent", sub.get("_id"))
+            crud_mongo.delete_by_uuid(db_mongo, "MonitoringEvent", doc.get("_id"))
             continue
+
+        if "maximumNumberOfReports" in sub:
+            sub["maximumNumberOfReports"] = sub["maximumNumberOfReports"] - 1
+            doc["subscription"] = sub
+            crud_mongo.update(db_mongo, "MonitoringEvent", doc.get("_id"), doc)
 
         monitoringType = sub["monitoringType"]
 
@@ -192,7 +187,7 @@ async def handle_location_report_callback(location_reporting_sub, ue: UE):
     )
 
     notification = MonitoringNotification(
-        subscription=location_reporting_sub.get("link"),
+        subscription=location_reporting_sub.get("self"),
         monitoringEventReports=[
             MonitoringEventReport(
                 externalId=ue.external_identifier,

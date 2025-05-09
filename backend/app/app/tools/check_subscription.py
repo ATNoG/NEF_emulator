@@ -1,5 +1,6 @@
 import logging
 import time
+from typing import Optional
 from app.crud import crud_mongo
 
 
@@ -57,12 +58,12 @@ def check_expiration_time(expire_time):
         return False
 
 
-def check_numberOfReports(maximum_number_of_reports: int) -> bool:
-    if not maximum_number_of_reports:
+def check_numberOfReports(maximum_number_of_reports: Optional[int]) -> bool:
+    if maximum_number_of_reports is None:
         return True
 
-    if maximum_number_of_reports >= 1:
-        return True
+    if maximum_number_of_reports < 0:
+        logging.warning("Subscription has expired (maximum number of reports)")
+        return False
 
-    logging.warning("Subscription has expired (maximum number of reports")
-    return False
+    return True
